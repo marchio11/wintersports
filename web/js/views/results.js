@@ -77,6 +77,72 @@ function fullTable(res) {
     <tbody>${rows}</tbody></table></div>`;
 }
 
+// ---- Classifiche parziali (1ª/2ª manche nello sci, 1ª/2ª serie nel salto), ricavate dalla classifica finale ----
+
+/** "1:02.34" o "53.65" → secondi */
+function toSec(t) {
+  if (!t) return null;
+  const m = String(t).trim().match(/^(?:(\d+):)?(\d+(?:\.\d+)?)$/);
+  return m ? (m[1] ? parseInt(m[1], 10) * 60 : 0) + parseFloat(m[2]) : null;
+}
+
+function fmtGap(sec) {
+  const cents = Math.round(sec * 100);
+  const m = Math.floor(cents / 6000);
+  const rest = (cents % 6000) / 100;
+  return `+${m ? `${m}:${rest.toFixed(2).padStart(5, '0')}` : rest.toFixed(2)}`;
+}
+
+function rankBy(list, better) {
+  list.sort(better);
+  let rank = 0;
+  list.forEach((x, i) => { rank = i > 0 && better(list[i - 1], x) === 0 ? rank : i + 1; x.rank = rank; });
+  return list;
+}
+
+/** Quali tab parziali offrire per questo risultato: [{ key, label }] */
+function partialTabs(res) {
+  if (res.isRelay) return [];
+  const tabs = [];
+  if ((res.columns || []).includes('run1')) {
+    for (const n of [1, 2]) if (res.rows.some((r) => toSec(r.extra?.[`run${n}`]) != null)) tabs.push({ key: `run${n}`, label: `${n}ª manche` });
+  } else if (res.resultType === 'points') {
+    for (const n of [1, 2]) if (res.rows.some((r) => r.extra?.jumps?.[n - 1]?.points != null)) tabs.push({ key: `jump${n}`, label: `${n}ª serie` });
+  }
+  return tabs;
+}
+
+function partialTable(res, key) {
+  const n = Number(key.slice(-1));
+  let list;
+  if (key.startsWith('run')) {
+    list = res.rows.map((r) => ({ r, t: toSec(r.extra?.[`run${n}`]), txt: r.extra?.[`run${n}`] })).filter((x) => x.t != null);
+    rankBy(list, (a, b) => a.t - b.t);
+    const best = list[0]?.t;
+    list.forEach((x) => { x.main = x.rank === 1 ? x.txt : fmtGap(x.t - best); x.sub = x.rank === 1 ? '' : x.txt; });
+  } else {
+    list = res.rows.map((r) => ({ r, j: r.extra?.jumps?.[n - 1] })).filter((x) => x.j?.points != null);
+    rankBy(list, (a, b) => b.j.points - a.j.points);
+    const best = list[0]?.j.points;
+    list.forEach((x) => {
+      x.main = fmtNum(x.j.points);
+      x.sub = `${x.j.distance != null ? `${fmtNum(x.j.distance)} m` : ''}${x.rank > 1 ? ` · -${fmtNum(best - x.j.points)}` : ''}`;
+    });
+  }
+  if (!list.length) return '<p class="empty small">Dati non disponibili.</p>';
+  const note = key.startsWith('run')
+    ? `Tempi della ${n}ª manche${n === 2 ? ' (solo chi l\'ha disputata)' : ''}, ricavati dalla classifica finale.`
+    : `Punteggi della ${n}ª serie${n === 2 ? ' (solo chi l\'ha disputata)' : ''}, ricavati dalla classifica finale.`;
+  return `<div class="table-wrap"><table class="results">
+    <thead><tr><th>#</th><th>Atleta</th><th>${key.startsWith('run') ? 'Tempo' : 'Punti'}</th></tr></thead>
+    <tbody>${list.map((x) => `<tr class="${isIta(x.r) ? 'ita' : ''}">
+      <td class="pos">${x.rank}</td>
+      <td class="ath">${flag(x.r.nation)} <b>${esc(athleteName(x.r.name))}</b> <small class="nat">${esc(x.r.nation)}</small>${x.r.rank ? '' : `<div class="runs">${esc(statusLabel(x.r))}</div>`}</td>
+      <td class="tm">${esc(x.main)}${x.sub ? `<div class="runs">${esc(x.sub)}</div>` : ''}</td>
+    </tr>`).join('')}</tbody></table></div>
+    <p class="note">${note}</p>`;
+}
+
 function cardHead(race) {
   return `<header class="rc-head sport-${race.sport}">
     <div><b>${esc(race.disciplineName)}</b> <span class="g g-${race.gender}">${GENDERS[race.gender]}</span>${race.series ? ` <span class="badge comp">${esc(race.series)}</span>` : ''}${race.competition === 'WSC' ? ' <span class="badge comp">Mondiali</span>' : ''}</div>
@@ -91,11 +157,19 @@ async function fillCard(card, race, { expanded = false } = {}) {
     const res = await loadResult(race.id);
     if (!res) { body.innerHTML = '<p class="empty small">Risultati non ancora disponibili.</p>'; return; }
     const itaCount = res.rows.filter(isIta).length;
+    const tabs = partialTabs(res);
     body.innerHTML = `${podium(res)}
       <button class="btn wide toggle" aria-expanded="${expanded}">${expanded ? 'Nascondi classifica' : `Classifica completa (${res.rows.length})`}${itaCount ? ` · 🇮🇹 ${itaCount}` : ''}</button>
-      <div class="full" ${expanded ? '' : 'hidden'}>${fullTable(res)}
+      <div class="full" ${expanded ? '' : 'hidden'}>
+        ${tabs.length ? `<div class="segmented small" role="tablist">${[{ key: 'final', label: 'Finale' }, ...tabs].map((t, i) =>
+          `<button role="tab" class="${i === 0 ? 'on' : ''}" aria-selected="${i === 0}" data-tab="${t.key}">${t.label}</button>`).join('')}</div>` : ''}
+        <div class="tab-body">${fullTable(res)}</div>
         ${res.final ? '' : '<p class="note">Risultati provvisori</p>'}
         <p class="note"><a href="${esc(res.race.source?.url)}" target="_blank" rel="noopener">Fonte ufficiale ↗</a></p></div>`;
+    body.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => {
+      body.querySelectorAll('[data-tab]').forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-selected', String(x === b)); });
+      body.querySelector('.tab-body').innerHTML = b.dataset.tab === 'final' ? fullTable(res) : partialTable(res, b.dataset.tab);
+    }));
     const btn = body.querySelector('.toggle');
     const full = body.querySelector('.full');
     btn.addEventListener('click', () => {

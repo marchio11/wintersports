@@ -27,13 +27,13 @@ export function savePref(k, v) {
 }
 function loadFilters() {
   try {
-    const f = JSON.parse(localStorage.getItem('ws:filters'));
-    if (f && Array.isArray(f.sports) && Array.isArray(f.genders)) return f;
+    const f = JSON.parse(localStorage.getItem('ws:filters2'));
+    if (f && typeof f.sport === 'string' && typeof f.gender === 'string') return f;
   } catch { /* ignore */ }
-  return { sports: ['biathlon', 'alpine', 'crosscountry', 'jumping'], genders: ['M', 'F', 'X'] };
+  return { sport: 'all', gender: 'all' };
 }
 export function saveFilters() {
-  savePref('filters', JSON.stringify(store.filters));
+  savePref('filters2', JSON.stringify(store.filters));
 }
 
 export function toast(msg) {

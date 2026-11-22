@@ -120,6 +120,13 @@ export function renderCalendar(view) {
 
   const rerender = () => renderCalendar(view);
   bindFilters(view, rerender);
+  // il filtro selezionato resta sempre visibile nella riga scorrevole
+  view.querySelectorAll('.chips').forEach((row) => {
+    const on = row.querySelector('.chip.on');
+    if (on && (on.offsetLeft + on.offsetWidth > row.scrollLeft + row.clientWidth || on.offsetLeft < row.scrollLeft)) {
+      row.scrollLeft = on.offsetLeft - 16;
+    }
+  });
   view.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => {
     store.calendarMode = b.dataset.mode; savePref('mode', b.dataset.mode); rerender();
   }));

@@ -1,37 +1,37 @@
 // Componenti condivisi tra le viste.
-import { SPORTS, SPORT_ORDER, GENDERS, GENDER_SHORT, STATUS, COMPETITIONS, esc, flag, time } from '../format.js';
+import { SPORTS, SPORT_ORDER, GENDER_SHORT, STATUS, COMPETITIONS, esc, flag, time } from '../format.js';
 import { store, saveFilters } from '../app.js';
 
+// Filtri a scelta singola: toccando uno sport si vedono solo le sue gare;
+// toccandolo di nuovo (o "Tutti") si torna a vedere tutto. Idem per il genere.
 export function filtersBar() {
   const f = store.filters;
-  const sportChips = SPORT_ORDER.map((s) => `
-    <button class="chip sport-${s} ${f.sports.includes(s) ? 'on' : ''}" data-sport="${s}" aria-pressed="${f.sports.includes(s)}">
-      ${SPORTS[s].icon} ${SPORTS[s].short}</button>`).join('');
-  const genderChips = ['M', 'F', 'X'].map((g) => `
-    <button class="chip gender ${f.genders.includes(g) ? 'on' : ''}" data-gender="${g}" aria-pressed="${f.genders.includes(g)}">
-      ${GENDERS[g]}</button>`).join('');
+  const chip = (attr, val, label, on, cls = '') =>
+    `<button class="chip ${cls} ${on ? 'on' : ''}" data-${attr}="${val}" aria-pressed="${on}">${label}</button>`;
+  const sportChips = chip('sport', 'all', 'Tutti', f.sport === 'all') +
+    SPORT_ORDER.map((s) => chip('sport', s, `${SPORTS[s].icon} ${SPORTS[s].short}`, f.sport === s, `sport-${s}`)).join('');
+  const genderChips = chip('gender', 'all', 'Tutti', f.gender === 'all', 'gender') +
+    [['M', 'Uomini'], ['F', 'Donne'], ['X', 'Miste']].map(([g, l]) => chip('gender', g, l, f.gender === g, 'gender')).join('');
   return `<div class="filters"><div class="chips">${sportChips}</div><div class="chips">${genderChips}</div></div>`;
 }
 
 export function bindFilters(root, onChange) {
   root.querySelectorAll('[data-sport]').forEach((b) => b.addEventListener('click', () => {
-    toggle(store.filters.sports, b.dataset.sport);
+    const v = b.dataset.sport;
+    store.filters.sport = v === store.filters.sport ? 'all' : v;
     saveFilters(); onChange();
   }));
   root.querySelectorAll('[data-gender]').forEach((b) => b.addEventListener('click', () => {
-    toggle(store.filters.genders, b.dataset.gender);
+    const v = b.dataset.gender;
+    store.filters.gender = v === store.filters.gender ? 'all' : v;
     saveFilters(); onChange();
   }));
 }
 
-function toggle(arr, v) {
-  const i = arr.indexOf(v);
-  if (i >= 0) { if (arr.length > 1) arr.splice(i, 1); } else arr.push(v);
-}
-
 export function applyFilters(races) {
-  const { sports, genders } = store.filters;
-  return races.filter((r) => sports.includes(r.sport) && genders.includes(r.gender));
+  const { sport, gender } = store.filters;
+  return races.filter((r) => (sport === 'all' || r.sport === sport) &&
+    (gender === 'all' || r.gender === gender || (gender !== 'X' && r.gender === 'X')));
 }
 
 export function statusBadge(status) {
