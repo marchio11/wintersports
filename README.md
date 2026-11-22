@@ -6,7 +6,7 @@ Interfaccia in italiano, orari sempre in **ora italiana**.
 - **Backend + sito**: un unico Cloudflare Worker (piano gratuito) che
   - ogni 10 minuti scarica i dati dalle fonti, li normalizza e li salva in **KV**;
   - espone le API JSON `GET /calendar`, `GET /results/:raceId`, `GET /standings/:sport`, `GET /health` (con CORS);
-  - serve i file statici della PWA (cartella `web/`) con **Workers Static Assets**.
+  - serve i file statici della PWA (cartella `web/`), incorporati nel Worker a ogni build da `worker/scripts/build-static.mjs`.
 - **Frontend**: HTML/CSS/JavaScript puro, senza build (cartella `web/`).
 
 Piano completo, schema JSON e fonti dati: [PIANO.md](PIANO.md).
@@ -21,6 +21,10 @@ worker/        Cloudflare Worker (API + cron)
 web/           PWA servita dal Worker
 ```
 
+## Indirizzo dell'app
+
+**https://wintersports.andrea-marchionni11.workers.dev**
+
 ## Configurazione di Cloudflare (passo passo)
 
 > Se mi dai un API token Cloudflare posso fare io tutti questi passaggi. Ecco comunque come farli a mano.
@@ -32,12 +36,11 @@ web/           PWA servita dal Worker
 4. *Continue to summary* → *Create Token* e copia il token (si vede una volta sola).
 
 ### 2. Dal tuo computer (se fai tu)
-Serve Node.js 20 o più recente.
+Serve Node.js 20 o più recente. Il database KV esiste già ed è collegato in `wrangler.toml`.
 ```bash
 cd worker
 npm install
 npx wrangler login                      # apre il browser per autorizzare
-npx wrangler kv namespace create KV     # stampa un id: copialo in wrangler.toml al posto di REPLACE_WITH_KV_ID
 npx wrangler deploy                     # pubblica Worker + PWA + cron
 ```
 Alla fine wrangler stampa l'indirizzo, tipo `https://wintersports.<tuo-sottodominio>.workers.dev`.

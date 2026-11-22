@@ -3,17 +3,17 @@ name = "wintersports"
 main = "src/index.js"
 compatibility_date = "2026-11-01"
 workers_dev = true
+preview_urls = false
 
-# La PWA (cartella web/) è servita come file statici dallo stesso Worker:
-# un solo deploy, stesso dominio, richieste statiche gratuite e illimitate.
-[assets]
-directory = "../web"
-binding = "ASSETS"
+# La PWA (cartella web/) viene incorporata nel Worker a ogni build
+# (scripts/build-static.mjs): un solo deploy, stesso dominio.
+[build]
+command = "node scripts/build-static.mjs"
 
 # Database chiave-valore: l'id viene creato con `wrangler kv namespace create KV`
 [[kv_namespaces]]
 binding = "KV"
-id = "REPLACE_WITH_KV_ID"
+id = "f9935efbaa8d4a60a19cbf3efde73542"
 
 # Un solo cron ogni 10 minuti: il Worker decide da sé se lavorare
 # (sempre nei giorni di gara, altrimenti ogni ~30 minuti).

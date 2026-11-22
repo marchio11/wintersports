@@ -1,9 +1,10 @@
-// Worker: API JSON + cron di aggiornamento. I file statici della PWA (cartella web/)
-// sono serviti direttamente da Cloudflare (Workers Static Assets) senza passare di qui.
+// Worker: API JSON + cron di aggiornamento + file statici della PWA (cartella web/,
+// incorporati a ogni build da scripts/build-static.mjs).
 
 import { KEYS, ALL_SPORTS, SEASON, sortRaces } from './schema.js';
 import { getJson } from './store.js';
 import { runTick } from './scheduler.js';
+import { serveStatic } from './assets.js';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -60,7 +61,7 @@ export default {
       return json(result, 200, 0);
     }
 
-    if (request.method !== 'GET') return json({ error: 'metodo non consentito' }, 405);
+    if (request.method !== 'GET' && request.method !== 'HEAD') return json({ error: 'metodo non consentito' }, 405);
 
     if (path === '/calendar' || path === '/api/calendar') {
       return json(await calendar(env));
@@ -85,8 +86,7 @@ export default {
     }
 
     // Tutto il resto: file statici della PWA
-    if (env.ASSETS) return env.ASSETS.fetch(request);
-    return json({ error: 'non trovato' }, 404);
+    return serveStatic(request) || new Response('Pagina non trovata', { status: 404 });
   },
 
   async scheduled(event, env, ctx) {
