@@ -188,6 +188,10 @@ td.pts { color: var(--muted); }
 .members { display: grid; gap: 1px; margin-top: 3px; font-size: .78rem; color: var(--muted); }
 .members small { white-space: nowrap; }
 .runs { font-size: .76rem; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.move { display: inline-block; font-size: .72rem; font-weight: 700; padding: 0 5px; border-radius: 6px; margin-left: 4px; white-space: nowrap; }
+.move.up { color: #fff; background: #1a8f3c; }
+.move.down { color: #fff; background: #d0342c; }
+.move.same { color: var(--muted); background: var(--surface-2); }
 tr.divider td { background: var(--surface-2); color: var(--muted); font-size: .75rem; font-weight: 600; padding: 4px 8px; }
 .note { font-size: .78rem; color: var(--muted); margin: 8px 0 0; }
 .note a { color: var(--accent); }

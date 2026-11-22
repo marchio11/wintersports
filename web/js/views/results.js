@@ -45,6 +45,7 @@ function fullTable(res) {
   const showShoot = res.race.sport === 'biathlon';
   const showRuns = (res.columns || []).includes('run1');
   const points = res.resultType === 'points';
+  const ranks1 = firstPartRanks(res);
   let shownDivider = false;
   let lastPhase = null;
   const cols = 4 + (showShoot ? 1 : 0);
@@ -52,9 +53,9 @@ function fullTable(res) {
     const members = res.isRelay && r.members?.length
       ? `<div class="members">${r.members.map((m) => `<span class="${m.nation === 'ITA' ? 'ita-txt' : ''}">${typeof m.leg === 'number' ? `${m.leg}. ` : ''}${esc(athleteName(m.name))}${m.shooting ? ` <small>(${esc(m.shooting)})</small>` : ''}${m.jumps?.length ? `<div class="runs">${jumpsText(m.jumps)}</div>` : ''}</span>`).join('')}</div>`
       : '';
-    const jumps = !res.isRelay && r.extra?.jumps?.length ? `<div class="runs">${jumpsText(r.extra.jumps)}</div>` : '';
+    const jumps = !res.isRelay && r.extra?.jumps?.length ? `<div class="runs">${jumpsText(r.extra.jumps)}${movement(r, ranks1)}</div>` : '';
     const runs = showRuns && (r.extra?.run1 || r.extra?.run2)
-      ? `<div class="runs">${r.extra.run1 ? `1ª ${esc(r.extra.run1)}` : ''}${r.extra.run2 ? ` · 2ª ${esc(r.extra.run2)}` : ''}</div>`
+      ? `<div class="runs">${r.extra.run1 ? `1ª ${esc(r.extra.run1)}` : ''}${r.extra.run2 ? ` · 2ª ${esc(r.extra.run2)}` : ''}${movement(r, ranks1)}</div>`
       : '';
     let divider = '';
     if (!r.rank && r.status && !shownDivider) {
@@ -141,6 +142,33 @@ function partialTable(res, key) {
       <td class="tm">${esc(x.main)}${x.sub ? `<div class="runs">${esc(x.sub)}</div>` : ''}</td>
     </tr>`).join('')}</tbody></table></div>
     <p class="note">${note}</p>`;
+}
+
+/** Posizione dopo la 1ª manche/serie di ogni atleta (Map riga → posizione), se la gara ne ha due. */
+function firstPartRanks(res) {
+  if (res.isRelay) return null;
+  let list;
+  if ((res.columns || []).includes('run1')) {
+    if (!res.rows.some((r) => toSec(r.extra?.run2) != null)) return null;
+    list = res.rows.map((r) => ({ r, v: toSec(r.extra?.run1) })).filter((x) => x.v != null);
+    rankBy(list, (a, b) => a.v - b.v);
+  } else if (res.resultType === 'points') {
+    if (!res.rows.some((r) => r.extra?.jumps?.[1]?.points != null)) return null;
+    list = res.rows.map((r) => ({ r, v: r.extra?.jumps?.[0]?.points })).filter((x) => x.v != null);
+    rankBy(list, (a, b) => b.v - a.v);
+  } else return null;
+  return new Map(list.map((x) => [x.r, x.rank]));
+}
+
+/** Freccia con le posizioni guadagnate (verde) o perse (rossa) nella 2ª manche/serie. */
+function movement(row, ranks) {
+  const before = ranks?.get(row);
+  if (!before || !row.rank) return '';
+  const d = before - row.rank;
+  const title = `${before}° dopo la 1ª ${row.extra?.jumps ? 'serie' : 'manche'}`;
+  if (d > 0) return ` <span class="move up" title="${title}">▲ +${d}</span>`;
+  if (d < 0) return ` <span class="move down" title="${title}">▼ ${d}</span>`;
+  return ` <span class="move same" title="${title}">=</span>`;
 }
 
 function cardHead(race) {
