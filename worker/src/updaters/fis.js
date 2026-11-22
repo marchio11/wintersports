@@ -1,6 +1,7 @@
 // Aggiornamento incrementale generico per gli sport FIS (alpino, fondo, salto).
 // Ogni sport fornisce un "modulo" con: SECTOR, SPORT, SEASON_CODE, CATEGORIES,
-// isRealRace(detail), toRace(detail, event, competition, now), toResult(parsed, race, now).
+// isRealRace(detail), toRace(detail, event, competition, now), toResult(parsed, race, now)
+// e, se servono, isRealEvent(event) e parseResultsFor(html) (parser risultati specifico).
 
 import { KEYS, sortRaces, isValidRace } from '../schema.js';
 import { getJson, putIfChanged } from '../store.js';
@@ -60,7 +61,10 @@ export function makeFisUpdater(mod) {
             if (cat !== 'WC' && /vuoto|non trovata/.test(e.message)) continue; // es. nessun Mondiale quest'anno
             throw e;
           }
-          for (const e of events) merged.set(e.eventId, { ...e, competition: cat });
+          for (const e of events) {
+            if (mod.isRealEvent && !mod.isRealEvent(e)) continue;
+            merged.set(e.eventId, { ...e, competition: cat });
+          }
           okCount++;
         } catch (e) {
           errors.push(`calendario ${cat}: ${e.message}`);
@@ -109,7 +113,7 @@ export function makeFisUpdater(mod) {
         const res = await fetchText(urls.results(mod.SECTOR, raceId));
         stats.fetched++;
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const parsed = parseResults(res.text);
+        const parsed = (mod.parseResultsFor || parseResults)(res.text);
         if (!parsed) continue; // classifica non ancora pubblicata
         const race = { ...byId.get(id), hasResults: true };
         byId.set(id, race);
@@ -126,7 +130,7 @@ export function makeFisUpdater(mod) {
     if (errors.length) log(`${mod.SPORT} errors`, errors.join(' | '));
 
     stats.pending = events.some((e) => !e.cancelled && !st.detailsAt[e.eventId]) ||
-      races.some((r) => r.resultsAvailable && !r.hasResults && r.status !== 'cancelled');
+      races.some((r) => r.resultsAvailable && !r.hasResults && r.status === 'finished');
     const ok = errors.length === 0 || stats.fetched > errors.length;
     return { ok, error: errors.slice(0, 5).join(' | ') || undefined, stats };
   };

@@ -1,6 +1,6 @@
 // Sci alpino (FIS sector AL): mappe specifiche e conversione nel formato comune.
 import { SPORTS } from '../../schema.js';
-import { urls } from './common.js';
+import { urls, startOf } from './common.js';
 
 export const SECTOR = 'AL';
 export const SPORT = SPORTS.ALPINE;
@@ -82,6 +82,7 @@ export function statusOf(d, now = Date.now()) {
 export function toRace(d, event, competition, now = Date.now()) {
   const { discipline, disciplineName } = mapDiscipline(d.discipline);
   const status = statusOf(d, now);
+  const { startUtc, timeTbc } = startOf(d);
   return {
     id: `fis-al-${d.raceId}`,
     sport: SPORT,
@@ -92,9 +93,9 @@ export function toRace(d, event, competition, now = Date.now()) {
     gender: genderOf(d.genders),
     location: placeName(event.place),
     country: event.nation || null,
-    startUtc: d.startIso ? isoUtc(d.startIso) : null,
+    startUtc,
     localTimezone: d.timezone,
-    timeTbc: !d.startIso,
+    timeTbc,
     status,
     hasResults: false, // diventa true quando la classifica è salvata in KV
     resultsAvailable: d.dataAvailable,

@@ -67,7 +67,7 @@ export function parseCalendar(html) {
   for (const r of rows) {
     const id = r.match(/^[^>]*\bid="(\d+)"/)?.[1];
     if (!id) continue;
-    const dateText = r.match(/target="_self">\s*([^<]*\d{4})\s*<\/a>/)?.[1];
+    const dateText = r.match(/target="_self">\s*([^<]*(?:<br\s*\/?>[^<]*)?\d{4})\s*<\/a>/)?.[1]?.replace(/<br\s*\/?>/g, '');
     const place = r.match(/<div class="clip bold font_md_large font_lg_large">([^<]+)<\/div>/)?.[1]
       || r.match(/<span class="bold clip-xs">([^<]+)<\/span>/)?.[1];
     const nation = r.match(/country__name-short">([A-Z]{3})</)?.[1] || null;
@@ -103,6 +103,7 @@ export function parseEventDetails(html) {
       || r.match(/<div class="g-xs-12 justify-left">\s*([A-Z]{2,5})\s*<\/div>/)?.[1] || null;
     const genders = [...new Set([...r.matchAll(/gender__item gender__item_\w">(\w)<\/div>/g)].map((m) => m[1]))];
     const startIso = r.match(/data-iso-date="([^"]+)"/)?.[1] || null;
+    const date = r.match(/data-date="(\d{4}-\d{2}-\d{2})"/)?.[1] || null;
     const timezone = r.match(/data-timezone="([^"]+)"/)?.[1] || null;
     const runs = [...r.matchAll(
       /justify-left">\s*([\w.]+)\s*<\/div>\s*<div class="g-lg g-md g-sm g-xs justify-left">\s*(?:<div class="timezone-time"[^>]*data-iso-date="([^"]*)"[^>]*>[^<]*<\/div>)?\s*<\/div>\s*<div class="g-lg-5 g-md-9 justify-left hidden-sm-down">\s*([^<]*?)\s*<\/div>/g,
@@ -114,6 +115,7 @@ export function parseEventDetails(html) {
       category,
       genders,
       startIso,
+      date,
       timezone,
       runs,
       dataAvailable: titles.includes('Data available'),
@@ -140,60 +142,108 @@ function sectionStatus(title) {
 }
 
 /**
- * Pagina risultati FIS. Le colonne si riconoscono dalla classe CSS:
+ * Scorre le righe della classifica di una pagina risultati FIS.
+ * Ritorna null se non c'è una classifica (gara futura o lista di partenza "Order").
+ * Ogni riga: { html, status, statusDetail, basics }.
+ */
+export function resultRows(html) {
+  const start = html.indexOf('id="events-info-results"');
+  if (start < 0) return null;
+  // intestazione della tabella: se è una lista di partenza ("Order") non ci sono risultati
+  const head = html.slice(Math.max(0, html.lastIndexOf('class="table__head"', start)), start);
+  if (/>\s*Order\s*</.test(head)) return null;
+  const body = html.slice(start);
+  // le sezioni (Did not finish…) sono intestazioni "thead_slave" tra un blocco e l'altro
+  const chunks = body.split(/<div class="thead thead_slave">/);
+  const out = [];
+  let status = null;
+  let statusDetail = null;
+  for (let ci = 0; ci < chunks.length; ci++) {
+    const chunk = chunks[ci];
+    if (ci > 0) {
+      const t = decode(chunk.match(/<div class="g-xs-24 bold">([^<]+)<\/div>/)?.[1] || '');
+      if (t) { status = sectionStatus(t); statusDetail = t; }
+    }
+    for (const r of chunk.split(/<a class="table-row[\s"]/).slice(1)) {
+      const basics = rowBasics(r);
+      if (!basics.name) continue;
+      out.push({ html: r, status, statusDetail: status ? statusDetail : null, basics });
+    }
+  }
+  return out;
+}
+
+/** Campi comuni a tutte le righe FIS: posizione, pettorale, codice, nome, nazione. */
+export function rowBasics(r) {
+  const name = r.match(/athlete-name">([^<]+)</)?.[1]
+    || r.match(/<div class="g-lg[^"]*justify-left bold">\s*([^<]+?)\s*</)?.[1];
+  const rankTxt = r.match(/<div class="g-lg-1 g-md-1 g-sm-1 g-xs-2 justify-right[^"]*">\s*(\d*)\s*</)?.[1];
+  const bib = r.match(/<div class="g-lg-1 g-md-1 g-sm-1[^"]*gray">\s*([\d-]+)\s*</)?.[1];
+  const fisCode = r.match(/hidden-xs justify-right gray[^"]*">\s*(\d+)\s*</)?.[1];
+  const nation = r.match(/country__name-short">([A-Z]{3})</)?.[1] || null;
+  return {
+    name: name ? decode(name) : null,
+    rank: rankTxt ? parseInt(rankTxt, 10) : null,
+    bib: bib && /^\d+$/.test(bib) ? parseInt(bib, 10) : (bib || null),
+    athleteId: fisCode ? `fis-${fisCode}` : null,
+    nation,
+    team: /table-row_theme_main/.test(r.slice(0, 120)),
+    member: /table-row_theme_additional/.test(r.slice(0, 120)),
+  };
+}
+
+export function headerInfo(html) {
+  return {
+    title: decode(html.match(/event-header__kind">([\s\S]*?)<\/div>/)?.[1] || ''),
+    raceIso: html.match(/event-header__date[\s\S]*?data-iso-date="([^"]+)"/)?.[1] || null,
+  };
+}
+
+/**
+ * Pagina risultati FIS "a tempo" (alpino, fondo). Le colonne si riconoscono dalla classe CSS:
  *  - "g-sm-2 justify-right bold hidden-xs"      → tempi delle manche/frazioni
  *  - "justify-right blue bold"                  → tempo totale (desktop)
  *  - "g-sm-3 g-xs-5 justify-right bold"         → tempo (vincitore) o distacco
  *  - "g-sm-2 justify-right hidden-xs"           → punti Coppa (ultima colonna)
  */
 export function parseResults(html) {
-  const start = html.indexOf('id="events-info-results"');
-  if (start < 0) return null; // nessuna classifica pubblicata
-  const body = html.slice(start);
-  const title = decode(html.match(/event-header__kind">([\s\S]*?)<\/div>/)?.[1] || '');
-  const raceIso = html.match(/event-header__date[\s\S]*?data-iso-date="([^"]+)"/)?.[1] || null;
-
-  // le sezioni (Did not finish…) sono intestazioni "thead_slave" tra un blocco e l'altro
-  const chunks = body.split(/<div class="thead thead_slave">/);
-  const rows = [];
-  let status = null;
-  for (let ci = 0; ci < chunks.length; ci++) {
-    const chunk = chunks[ci];
-    if (ci > 0) {
-      const t = decode(chunk.match(/<div class="g-xs-24 bold">([^<]+)<\/div>/)?.[1] || '');
-      status = t ? sectionStatus(t) : status;
-    }
-    for (const r of chunk.split('<a class="table-row"').slice(1)) {
-      // nome: con marca degli sci (".athlete-name") oppure direttamente nella colonna "Athlete"
-      const name = r.match(/athlete-name">([^<]+)</)?.[1]
-        || r.match(/<div class="g-lg-\d+ g-md-\d+ g-sm-\d+ g-xs-\d+ justify-left bold">\s*([^<]+?)\s*<\/div>/)?.[1];
-      if (!name) continue;
-      const nation = r.match(/country__name-short">([A-Z]{3})</)?.[1] || null;
-      const rankTxt = r.match(/justify-right pr-1 bold">\s*(\d*)\s*</)?.[1];
-      const bib = r.match(/justify-center hidden-sm-down gray">\s*(\d+)\s*</)?.[1];
-      const fisCode = r.match(/hidden-xs justify-right gray">\s*(\d+)\s*</)?.[1];
-      const tail = r.slice(r.indexOf('country__name-short'));
-      const runs = [...tail.matchAll(/<div class="[^"]*g-sm-2 justify-right bold hidden-xs">\s*([^<]*?)\s*<\/div>/g)].map((m) => m[1]);
-      const total = tail.match(/justify-right blue bold[^"]*">\s*([^<]*?)\s*<\/div>/)?.[1] || '';
-      const timeOrGap = decode(tail.match(/g-xs-5 justify-right bold">\s*(?:<span[^>]*>)?\s*([^<]*?)\s*</)?.[1] || '');
-      const cup = [...tail.matchAll(/<div class="g-lg-2 g-md-2 g-sm-2 justify-right hidden-xs">\s*([^<]*?)\s*<\/div>/g)].map((m) => m[1]).pop();
-      const rank = status ? null : (rankTxt ? parseInt(rankTxt, 10) : null);
-      rows.push({
-        rank,
-        bib: bib ? parseInt(bib, 10) : null,
-        athleteId: fisCode ? `fis-${fisCode}` : null,
-        name: decode(name),
-        nation,
-        time: status ? null : (total || (timeOrGap.startsWith('+') ? null : timeOrGap) || null),
-        gap: status || !timeOrGap.startsWith('+') ? null : timeOrGap,
-        points: null,
-        cupPoints: cup && /^\d+$/.test(cup) ? parseInt(cup, 10) : null,
-        status,
-        statusDetail: status && ci > 0 ? decode(chunk.match(/<div class="g-xs-24 bold">([^<]+)<\/div>/)?.[1] || '') : null,
-        extra: { runs: runs.filter((x) => x !== '') },
-      });
-    }
-  }
+  const list = resultRows(html);
+  if (!list) return null;
+  const rows = list.map(({ html: r, status, statusDetail, basics }) => {
+    const tail = r.slice(r.indexOf('country__name-short'));
+    const runs = [...tail.matchAll(/<div class="[^"]*g-sm-2 justify-right bold hidden-xs">\s*([^<]*?)\s*<\/div>/g)].map((m) => m[1]);
+    const total = tail.match(/justify-right blue bold[^"]*">\s*([^<]*?)\s*<\/div>/)?.[1] || '';
+    const timeOrGap = decode(tail.match(/g-xs-5 justify-right bold">\s*(?:<span[^>]*>)?\s*([^<]*?)\s*</)?.[1] || '');
+    const cup = [...tail.matchAll(/<div class="g-lg-2 g-md-2 g-sm-2 justify-right hidden-xs">\s*([^<]*?)\s*<\/div>/g)].map((m) => m[1]).pop();
+    return {
+      rank: status ? null : basics.rank,
+      bib: basics.bib,
+      athleteId: basics.athleteId,
+      name: basics.name,
+      nation: basics.nation,
+      time: status ? null : (total || (timeOrGap.startsWith('+') ? null : timeOrGap) || null),
+      gap: status || !timeOrGap.startsWith('+') ? null : timeOrGap,
+      points: null,
+      cupPoints: cup && /^\d+$/.test(cup) ? parseInt(cup, 10) : null,
+      status,
+      statusDetail,
+      extra: { runs: runs.filter((x) => x !== '') },
+    };
+  });
   if (!rows.length) return null;
-  return { title, raceIso, rows };
+  return { ...headerInfo(html), rows };
 }
+
+/** Orario di partenza: istante esatto, oppure solo la data (orario da definire). */
+export function startOf(d) {
+  if (d.startIso) {
+    const t = Date.parse(d.startIso);
+    if (!Number.isNaN(t)) return { startUtc: new Date(t).toISOString(), timeTbc: false };
+  }
+  if (d.date) return { startUtc: `${d.date}T11:00:00.000Z`, timeTbc: true };
+  return { startUtc: null, timeTbc: true };
+}
+
+/** Punti di Coppa del Mondo per posizione (gare individuali di salto e fondo). */
+export const WC_POINTS = [100, 80, 60, 50, 45, 40, 36, 32, 29, 26, 24, 22, 20, 18, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
+export const cupPointsFor = (rank) => (rank && rank <= 30 ? WC_POINTS[rank - 1] : null);

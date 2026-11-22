@@ -6,10 +6,12 @@ import { romeDateKey } from './time.js';
 import { updateBiathlon } from './updaters/biathlon.js';
 import { makeFisUpdater } from './updaters/fis.js';
 import * as alpine from './sources/fis/alpine.js';
+import * as jumping from './sources/fis/jumping.js';
 
 const UPDATERS = {
   [SPORTS.BIATHLON]: updateBiathlon,
   [SPORTS.ALPINE]: makeFisUpdater(alpine),
+  [SPORTS.JUMPING]: makeFisUpdater(jumping),
 };
 
 const QUIET_INTERVAL_MS = 30 * 60e3 - 60e3; // ~30 minuti nei giorni senza gare

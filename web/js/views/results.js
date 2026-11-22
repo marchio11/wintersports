@@ -25,9 +25,13 @@ function podium(res) {
     <li class="p${r.rank} ${isIta(r) ? 'ita' : ''}">
       <span class="medal">${['🥇', '🥈', '🥉'][r.rank - 1]}</span>
       <span class="who">${flag(r.nation)} ${esc(res.isRelay ? r.name : athleteName(r.name))}</span>
-      <span class="res">${esc(r.gap || r.time || (r.points ?? ''))}</span>
+      <span class="res">${res.resultType === 'points' ? (r.points != null ? `${fmtNum(r.points)} pt` : '') : esc(r.gap || r.time || '')}</span>
     </li>`).join('')}</ol>`;
 }
+
+const fmtNum = (n) => Number(n).toLocaleString('it-IT', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const jumpsText = (jumps) => jumps.filter((j) => j.distance != null)
+  .map((j) => `${fmtNum(j.distance)} m${j.points != null ? ` (${fmtNum(j.points)})` : ''}`).join(' · ');
 
 const STATUS_IT = { DNF: 'Non arrivato', DNS: 'Non partito', DSQ: 'Squalificato', DNQ: 'Non qualificato', LAP: 'Doppiato', NC: 'Non classificato' };
 
@@ -39,12 +43,14 @@ function statusLabel(r) {
 function fullTable(res) {
   const showShoot = res.race.sport === 'biathlon';
   const showRuns = (res.columns || []).includes('run1');
+  const points = res.resultType === 'points';
   let shownDivider = false;
   const cols = 4 + (showShoot ? 1 : 0);
   const rows = res.rows.map((r) => {
     const members = res.isRelay && r.members?.length
-      ? `<div class="members">${r.members.map((m) => `<span class="${m.nation === 'ITA' ? 'ita-txt' : ''}">${m.leg}. ${esc(athleteName(m.name))}${m.shooting ? ` <small>(${esc(m.shooting)})</small>` : ''}</span>`).join('')}</div>`
+      ? `<div class="members">${r.members.map((m) => `<span class="${m.nation === 'ITA' ? 'ita-txt' : ''}">${typeof m.leg === 'number' ? `${m.leg}. ` : ''}${esc(athleteName(m.name))}${m.shooting ? ` <small>(${esc(m.shooting)})</small>` : ''}${m.jumps?.length ? ` <small>${jumpsText(m.jumps)}</small>` : ''}</span>`).join('')}</div>`
       : '';
+    const jumps = !res.isRelay && r.extra?.jumps?.length ? `<div class="runs">${jumpsText(r.extra.jumps)}</div>` : '';
     const runs = showRuns && (r.extra?.run1 || r.extra?.run2)
       ? `<div class="runs">${r.extra.run1 ? `1ª ${esc(r.extra.run1)}` : ''}${r.extra.run2 ? ` · 2ª ${esc(r.extra.run2)}` : ''}</div>`
       : '';
@@ -53,14 +59,14 @@ function fullTable(res) {
       : '';
     return `${divider}<tr class="${isIta(r) ? 'ita' : ''}">
       <td class="pos">${r.rank ?? `<small title="${esc(statusLabel(r))}">${esc(r.status || '')}</small>`}</td>
-      <td class="ath">${flag(r.nation)} <b>${esc(res.isRelay ? r.name : athleteName(r.name))}</b> <small class="nat">${esc(r.nation)}</small>${members}${runs}${!r.rank && r.status ? `<div class="runs">${esc(statusLabel(r))}</div>` : ''}</td>
+      <td class="ath">${flag(r.nation)} <b>${esc(res.isRelay ? r.name : athleteName(r.name))}</b> <small class="nat">${esc(r.nation)}</small>${members}${runs}${jumps}${!r.rank && r.status ? `<div class="runs">${esc(statusLabel(r))}</div>` : ''}</td>
       ${showShoot ? `<td class="sh"><small>${esc(r.extra?.shooting || '')}</small></td>` : ''}
-      <td class="tm">${r.rank === 1 ? esc(r.time || '') : esc(r.gap || r.time || '')}${r.points != null ? esc(r.points) : ''}</td>
+      <td class="tm">${points ? `${r.points != null ? fmtNum(r.points) : ''}${r.gap ? `<div class="runs">${esc(r.gap.replace('.', ','))}</div>` : ''}` : (r.rank === 1 ? esc(r.time || '') : esc(r.gap || r.time || ''))}</td>
       <td class="pts">${r.cupPoints ?? ''}</td>
     </tr>`;
   }).join('');
   return `<div class="table-wrap"><table class="results">
-    <thead><tr><th>#</th><th>Atleta</th>${showShoot ? '<th>Tiro</th>' : ''}<th>Tempo</th><th title="Punti Coppa del Mondo">Pt</th></tr></thead>
+    <thead><tr><th>#</th><th>Atleta</th>${showShoot ? '<th>Tiro</th>' : ''}<th>${res.resultType === 'points' ? 'Punti' : 'Tempo'}</th><th title="Punti Coppa del Mondo">Pt</th></tr></thead>
     <tbody>${rows}</tbody></table></div>`;
 }
 
