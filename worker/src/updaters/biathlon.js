@@ -1,38 +1,15 @@
 // Aggiornamento incrementale dei dati del biathlon (eseguito a ogni tick del cron).
 
 import { KEYS, SPORTS, sortRaces, isValidRace } from '../schema.js';
-import { getJson, putIfChanged, canonical } from '../store.js';
+import { getJson, putIfChanged } from '../store.js';
 import { fetchText } from '../http.js';
 import { BASE, parseCalendarPage, parseResultPage, candidateRaceIds } from '../sources/biathlon.js';
+import { mergeRace, raceIdsNeedingResults } from './common.js';
 
 const SPORT = SPORTS.BIATHLON;
 const SWEEP_EVERY_MS = 20 * 3600e3; // una scansione completa delle tappe al giorno
 
-/** Unisce la versione nuova di una gara a quella salvata. */
-export function mergeRace(old, next) {
-  if (!old) return next;
-  const merged = { ...old, ...next };
-  merged.hasResults = !!(old.hasResults || next.hasResults);
-  if (merged.hasResults && merged.status === 'live' && old.status === 'finished') merged.status = 'finished';
-  if (!next.startUtc && old.startUtc) { merged.startUtc = old.startUtc; merged.timeTbc = old.timeTbc; }
-  merged.updatedAt = canonical(old) === canonical(merged) ? old.updatedAt : next.updatedAt;
-  return merged;
-}
-
-/** Gare di cui (ri)scaricare i risultati, in ordine di priorità. */
-export function raceIdsNeedingResults(races, now) {
-  const WEEK = 7 * 24 * 3600e3;
-  return races
-    .filter((r) => r.startUtc && r.status !== 'cancelled' && r.status !== 'postponed')
-    .filter((r) => {
-      const start = Date.parse(r.startUtc);
-      if (start > now || now - start > WEEK) return false;
-      if (!r.hasResults || r.status !== 'finished') return true;
-      return now - start < 6 * 3600e3; // per qualche ora ricontrolla (risultati ufficiali/correzioni)
-    })
-    .sort((a, b) => Date.parse(b.startUtc) - Date.parse(a.startUtc))
-    .map((r) => r.source.raceId);
-}
+export { mergeRace, raceIdsNeedingResults };
 
 /**
  * @param {object} ctx { kv, now, state, budget: { results, probes }, log }
@@ -117,6 +94,7 @@ export async function updateBiathlon(ctx) {
   const races = sortRaces([...byId.values()]);
   if (races.length) stats.calendarWritten = await putIfChanged(kv, KEYS.calendar(SPORT), races, stored);
 
+  stats.pending = !st.sweepDoneAt || !!st.sweepCursor;
   const ok = errors.length === 0 || (stats.fetched > errors.length);
   return { ok, error: errors.slice(0, 5).join(' | ') || undefined, stats };
 }

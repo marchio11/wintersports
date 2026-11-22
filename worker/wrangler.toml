@@ -22,7 +22,9 @@ crons = ["*/10 * * * *"]
 
 [vars]
 BUDGET_RESULTS = "4"
-BUDGET_PROBES = "12"
+BUDGET_PROBES = "10"
+FIS_DETAILS = "3"
+FIS_RESULTS = "3"
 
 [observability]
 enabled = true

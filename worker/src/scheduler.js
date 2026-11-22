@@ -4,9 +4,12 @@ import { KEYS, ALL_SPORTS, SPORTS } from './schema.js';
 import { getJson } from './store.js';
 import { romeDateKey } from './time.js';
 import { updateBiathlon } from './updaters/biathlon.js';
+import { makeFisUpdater } from './updaters/fis.js';
+import * as alpine from './sources/fis/alpine.js';
 
 const UPDATERS = {
   [SPORTS.BIATHLON]: updateBiathlon,
+  [SPORTS.ALPINE]: makeFisUpdater(alpine),
 };
 
 const QUIET_INTERVAL_MS = 30 * 60e3 - 60e3; // ~30 minuti nei giorni senza gare
@@ -24,8 +27,8 @@ export async function runTick(env, { now = Date.now(), force = false, log = cons
   const calendars = await Promise.all(ALL_SPORTS.map((s) => getJson(kv, KEYS.calendar(s), [])));
   const raceDay = isRaceDay(calendars.flat(), now);
 
-  // finché la prima scansione completa del calendario non è finita, lavora a ogni tick
-  const bootstrapping = !state.biathlon?.sweepDoneAt;
+  // finché uno sport ha lavoro arretrato (es. primo scaricamento del calendario), lavora a ogni tick
+  const bootstrapping = Object.values(state.pending || {}).some(Boolean) || !state.biathlon?.sweepDoneAt;
   if (!force && !raceDay && !bootstrapping && state.lastWorkAt && now - state.lastWorkAt < QUIET_INTERVAL_MS) {
     return { skipped: true, raceDay };
   }
@@ -33,7 +36,9 @@ export async function runTick(env, { now = Date.now(), force = false, log = cons
   const budget = {
     results: Number(env.BUDGET_RESULTS || 4),
     probes: Number(env.BUDGET_PROBES || 12),
+    fis: { details: Number(env.FIS_DETAILS || 3), results: Number(env.FIS_RESULTS || 3) },
   };
+  state.pending ||= {};
   const health = await getJson(kv, KEYS.health, {});
   const report = {};
 
@@ -41,6 +46,7 @@ export async function runTick(env, { now = Date.now(), force = false, log = cons
     try {
       const r = await update({ kv, now, state, budget, log });
       report[sport] = r;
+      state.pending[sport] = !!r.stats?.pending;
       const prev = health[sport] || {};
       health[sport] = r.ok
         ? { ok: true, updatedAt: new Date(now).toISOString(), lastError: r.error || null }

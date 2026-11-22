@@ -212,9 +212,9 @@ Codici nazione IOC/FIS a 3 lettere (`ITA`). `sport` ∈ `alpine | biathlon | cro
 ---
 
 ## 6. Fasi
-1. **Worker + biathlon + frontend base** (vedi §8: biathlon bloccato)
-2. Sci di fondo
-3. Sci alpino
+1. ✅ **Worker + biathlon + frontend base**
+2. ✅ **Sci alpino** (anticipato su richiesta: Coppa del Mondo + Mondiali di Crans-Montana, prove escluse)
+3. Sci di fondo
 4. Salto con gli sci
 5. Classifiche di Coppa, rifiniture grafiche, PWA completa
 

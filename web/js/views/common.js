@@ -50,6 +50,7 @@ export function raceRow(r) {
         ${esc(r.disciplineName)}
       </div>
       <div class="race-sub">${SPORTS[r.sport].icon} ${SPORTS[r.sport].short} · ${flag(r.country)} ${esc(r.location)} ${comp}</div>
+      ${r.runs?.length > 1 && r.runs[1].startUtc ? `<div class="race-sub">2ª manche ${time(r.runs[1].startUtc)}</div>` : ''}
     </div>
     <div class="race-status">${statusBadge(r.status)}</div>
   </a>`;

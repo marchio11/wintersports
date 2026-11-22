@@ -29,15 +29,31 @@ function podium(res) {
     </li>`).join('')}</ol>`;
 }
 
+const STATUS_IT = { DNF: 'Non arrivato', DNS: 'Non partito', DSQ: 'Squalificato', DNQ: 'Non qualificato', LAP: 'Doppiato', NC: 'Non classificato' };
+
+function statusLabel(r) {
+  const run = /1st run/i.test(r.statusDetail || '') ? ' (1ª manche)' : /2nd run/i.test(r.statusDetail || '') ? ' (2ª manche)' : '';
+  return (STATUS_IT[r.status] || r.status || '') + run;
+}
+
 function fullTable(res) {
   const showShoot = res.race.sport === 'biathlon';
+  const showRuns = (res.columns || []).includes('run1');
+  let shownDivider = false;
+  const cols = 4 + (showShoot ? 1 : 0);
   const rows = res.rows.map((r) => {
     const members = res.isRelay && r.members?.length
       ? `<div class="members">${r.members.map((m) => `<span class="${m.nation === 'ITA' ? 'ita-txt' : ''}">${m.leg}. ${esc(athleteName(m.name))}${m.shooting ? ` <small>(${esc(m.shooting)})</small>` : ''}</span>`).join('')}</div>`
       : '';
-    return `<tr class="${isIta(r) ? 'ita' : ''}">
-      <td class="pos">${r.rank ?? `<small>${esc(r.status || '')}</small>`}</td>
-      <td class="ath">${flag(r.nation)} <b>${esc(res.isRelay ? r.name : athleteName(r.name))}</b> <small class="nat">${esc(r.nation)}</small>${members}</td>
+    const runs = showRuns && (r.extra?.run1 || r.extra?.run2)
+      ? `<div class="runs">${r.extra.run1 ? `1ª ${esc(r.extra.run1)}` : ''}${r.extra.run2 ? ` · 2ª ${esc(r.extra.run2)}` : ''}</div>`
+      : '';
+    const divider = !r.rank && r.status && !shownDivider
+      ? ((shownDivider = true), `<tr class="divider"><td colspan="${cols}">Non classificati</td></tr>`)
+      : '';
+    return `${divider}<tr class="${isIta(r) ? 'ita' : ''}">
+      <td class="pos">${r.rank ?? `<small title="${esc(statusLabel(r))}">${esc(r.status || '')}</small>`}</td>
+      <td class="ath">${flag(r.nation)} <b>${esc(res.isRelay ? r.name : athleteName(r.name))}</b> <small class="nat">${esc(r.nation)}</small>${members}${runs}${!r.rank && r.status ? `<div class="runs">${esc(statusLabel(r))}</div>` : ''}</td>
       ${showShoot ? `<td class="sh"><small>${esc(r.extra?.shooting || '')}</small></td>` : ''}
       <td class="tm">${r.rank === 1 ? esc(r.time || '') : esc(r.gap || r.time || '')}${r.points != null ? esc(r.points) : ''}</td>
       <td class="pts">${r.cupPoints ?? ''}</td>

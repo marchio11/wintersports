@@ -85,7 +85,9 @@ export function athleteName(name) {
   const family = [];
   while (parts.length && parts[0] === parts[0].toUpperCase() && /[A-ZÀ-Ý]/.test(parts[0])) family.push(parts.shift());
   if (!family.length || !parts.length) return name;
-  const fam = family.map((p) => p.charAt(0) + p.slice(1).toLowerCase().replace(/([-'])(\p{L})/gu, (m, a, b) => a + b.toUpperCase())).join(' ');
+  const fam = family.map((p) => (p.charAt(0) + p.slice(1).toLowerCase())
+    .replace(/([-'])(\p{L})/gu, (m, a, b) => a + b.toUpperCase())
+    .replace(/^(Mc)(\p{L})/u, (m, a, b) => a + b.toUpperCase())).join(' ');
   return `${parts.join(' ')} ${fam}`;
 }
 
