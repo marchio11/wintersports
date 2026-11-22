@@ -1,7 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#0f1b2d"/>
-  <path d="M0 360 L150 220 L230 290 L340 170 L512 330 L512 512 L0 512 Z" fill="#e8eef6"/>
-  <path d="M340 170 L300 215 L330 230 L360 205 L395 222 Z M150 220 L120 248 L150 262 L175 243 Z" fill="#0f1b2d" opacity=".25"/>
-  <g stroke="#7b2cbf" stroke-width="18" fill="none"><circle cx="390" cy="118" r="54"/><circle cx="390" cy="118" r="22" fill="#7b2cbf"/></g>
-  <g fill="#ffffff"><circle cx="120" cy="110" r="7"/><circle cx="200" cy="70" r="5"/><circle cx="250" cy="140" r="6"/><circle cx="80" cy="190" r="5"/></g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4c9dff"/><stop offset="1" stop-color="#1f63d6"/></linearGradient></defs><rect width="512" height="512" rx="120" fill="url(#bg)"/><g transform="translate(256 256) scale(.9) translate(-256 -270)"><g fill="#fff">
+  <g transform="rotate(-34 256 318)"><path d="M235 168 q0 -54 21 -70 q21 16 21 70 v252 a21 21 0 0 1 -42 0z"/></g>
+  <g transform="rotate(34 256 318)"><path d="M235 168 q0 -54 21 -70 q21 16 21 70 v252 a21 21 0 0 1 -42 0z"/></g>
+</g><g stroke="#fff" stroke-width="15" stroke-linecap="round" stroke-linejoin="round" fill="none" transform="translate(256 150)">
+  <g id="arm"><line x1="0" y1="0" x2="0" y2="-50"/><polyline points="-15,-36 0,-23 15,-36"/></g>
+  <use href="#arm" transform="rotate(60)"/><use href="#arm" transform="rotate(120)"/>
+  <use href="#arm" transform="rotate(180)"/><use href="#arm" transform="rotate(240)"/><use href="#arm" transform="rotate(300)"/>
+</g></g></svg>

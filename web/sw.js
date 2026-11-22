@@ -1,11 +1,11 @@
 // Service worker: tiene in cache i file dell'app per aprirla anche offline.
 // I dati (API del Worker, altro dominio) restano gestiti da js/api.js con la copia locale.
-const VERSION = 'neve-v1';
+const VERSION = 'neve-v2';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
   'js/app.js', 'js/api.js', 'js/config.js', 'js/format.js',
   'js/views/calendar.js', 'js/views/common.js', 'js/views/results.js', 'js/views/standings.js',
-  'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png',
+  'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png',
 ];
 
 self.addEventListener('install', (e) => {
