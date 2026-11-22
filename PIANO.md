@@ -13,7 +13,8 @@ di **sci alpino, biathlon, sci di fondo e salto con gli sci**, maschile e femmin
 | FIS `event-details.html?eventid=…` | ✅ OK | Elenco gare della tappa con `raceid`, specialità, genere e **orario con fuso esplicito**: `data-iso-date="2026-10-24T10:30:00+02:00"` + `data-timezone="Europe/Vienna"`. |
 | FIS `results.html?raceid=…` | ✅ OK | Tabella `#events-info-results`: posizione, pettorale, codice FIS, nome (`.athlete-name`), anno, nazione (`.country__name-short`), tempi manche, totale, distacco, punti Coppa. |
 | FIS `cup-standings.html` | ✅ OK | Classifica generale di Coppa per settore/genere. |
-| biathlonresults.com `…/sportapi/api/Events`, `Competitions`, `Results`, `CupResults` | ❌ **401 Unauthorized** | Solo `Seasons` è ancora pubblico. Tutti gli altri endpoint ora richiedono autorizzazione. **Non va aggirata**: serve una decisione (vedi §8). |
+| biathlonresults.com `…/sportapi/api/…` | ❌ **401 Unauthorized** | Da novembre 2026 richiede autorizzazione. Non usata. |
+| **biathlonworld.com** (sito ufficiale IBU) | ✅ **Fonte biathlon scelta** | Pagine Next.js con i dati in `__NEXT_DATA__`: `/calendar` = tutte le tappe + gare della tappa corrente; `/results/<RaceId>` = orario UTC, stato e classifica completa (tempo, distacco, poligoni, punti WC, staffette con frazionisti). Le gare delle tappe future si scoprono provando gli id `<EventId><codice>` (es. `BT2627SWRLCP06SWMS`); un id inesistente risponde 500. |
 
 **Fuso orario FIS:** l'orario è quello locale della località di gara, ma la pagina espone già
 l'istante assoluto (ISO con offset). Il Worker salva sempre l'istante in **UTC**
@@ -28,10 +29,11 @@ Così gare in Nord America, Asia o Scandinavia risultano corrette anche col camb
             ┌──────────────── Cloudflare (piano gratuito) ────────────────┐
  FIS  ───►  │  Worker  ── Cron "*/10 * * * *" ──► scraper per sport ──► KV │
  IBU  ───►  │     │                                   (normalizza)        │
-            │     └── fetch(): GET /calendar /results/:id /standings/:s   │
-            └──────────────────────────────┬──────────────────────────────┘
-                                           │ JSON + CORS
-                         GitHub Pages ── PWA (HTML/CSS/JS, service worker)
+            │     ├── GET /calendar /results/:id /standings/:s (JSON+CORS)│
+            │     └── file statici della PWA (Workers Static Assets)      │
+            └─────────────────────────────────────────────────────────────┘
+
+Hosting: tutto su Cloudflare (come le altre webapp), un solo deploy, stesso dominio.
 ```
 
 ### Vincoli del piano gratuito e come li rispettiamo
@@ -60,7 +62,7 @@ Così gare in Nord America, Asia o Scandinavia risultano corrette anche col camb
 ```
 wintersports/
 ├── PIANO.md                    ← questo file
-├── README.md                   ← istruzioni di setup (Cloudflare + GitHub Pages)
+├── README.md                   ← istruzioni di setup (Cloudflare)
 ├── worker/
 │   ├── wrangler.toml           ← nome worker, binding KV, cron
 │   ├── package.json            ← wrangler + vitest (solo dev)
@@ -80,7 +82,7 @@ wintersports/
 │   └── test/
 │       ├── fixtures/           ← pagine HTML/JSON reali salvate
 │       └── *.test.js           ← test dei parser sulle fixture
-└── web/                        ← pubblicata su GitHub Pages
+└── web/                        ← PWA, servita dal Worker (Static Assets)
     ├── index.html
     ├── manifest.webmanifest
     ├── sw.js                   ← service worker (cache offline)
@@ -98,7 +100,7 @@ wintersports/
 ```
 
 ### Scelta del frontend: **HTML/CSS/JavaScript puro (moduli ES), senza build**
-- GitHub Pages serve i file così come sono: nessun Node, nessuna build, nessuna GitHub Action da mantenere.
+- Cloudflare serve i file così come sono: nessuna build e nessuna pipeline da mantenere.
 - L'app ha 3 viste e pochi dati: un framework aggiungerebbe peso senza benefici reali.
 - Prestazioni ottime su mobile (pochi KB), service worker semplice da scrivere a mano.
 - Se in futuro servisse più interattività si può aggiungere **Preact + htm** da CDN senza cambiare struttura.
@@ -230,25 +232,14 @@ Ogni parser ha test automatici su pagine reali salvate, così un cambio di layou
 4. `cd worker && npx wrangler deploy` → ottieni `https://wintersports.<tuo-sottodominio>.workers.dev`.
 5. Log in tempo reale: `npx wrangler tail`.
 
-**GitHub Pages**
-1. Repository → *Settings* → *Pages* → *Source: GitHub Actions* oppure *Deploy from branch* con cartella `/web`
-   (useremo una piccola Action che pubblica la cartella `web/`).
-2. In `web/js/config.js` si imposta l'URL del Worker.
+**Frontend**: servito dallo stesso Worker (cartella `web/`), nessuna configurazione aggiuntiva.
 
-**Posso farlo io?** In parte sì:
-- **Cloudflare**: se crei un *API token* Cloudflare (permessi "Edit Cloudflare Workers" + "Workers KV Storage"),
-  posso inserirlo in modo sicuro in questo ambiente (non in chat) e fare io KV + deploy con wrangler.
-  Altrimenti ti guido passo passo e lo lanci tu dal tuo PC: sono 4 comandi.
-- **GitHub Pages**: posso preparare la GitHub Action di pubblicazione; l'attivazione di Pages nelle
-  impostazioni del repo è un clic che conviene fare tu.
+**Chi lo fa**: Claude, con un *API token* Cloudflare (modello "Edit Cloudflare Workers") salvato in modo
+sicuro nell'ambiente (mai in chat). Passi manuali alternativi nel README.
 
 ---
 
-## 8. ⚠️ Decisione aperta: fonte dati del biathlon
-
-L'API di biathlonresults.com ora risponde **401** su calendario, gare e risultati. Possibilità:
-- **A. Riordinare le fasi** (consigliato): fase 1 = Worker + **sci di fondo** + frontend base (FIS verificato),
-  e il biathlon slitta a dopo il salto, intanto cerchiamo una fonte pubblica alternativa.
-- **B. Valutare il sito ufficiale IBU** (biathlonworld.com) come fonte da cui fare scraping, se espone
-  calendario e risultati in HTML/JSON pubblico: va verificato aprendo l'accesso di rete a quel dominio.
-- **C. Calendario biathlon "statico"** (inserito a mano in un JSON nel repo) + risultati più avanti.
+## 8. Decisioni prese
+- **Biathlon**: fonte = sito ufficiale IBU biathlonworld.com (vedi §1). Se in futuro l'IBU concedesse una chiave API personale, basterà sostituire `worker/src/sources/biathlon.js`.
+- **Hosting**: Cloudflare (Worker + Static Assets) invece di GitHub Pages, per avere tutto in un posto come le altre webapp.
+- **Deploy**: lo fa Claude con un API token Cloudflare fornito dall'utente.

@@ -1,0 +1,127 @@
+// Vista Risultati: gare concluse per sport (dalla più recente), podio e classifica completa.
+import { store, raceById } from '../app.js';
+import { api } from '../api.js';
+import { SPORTS, SPORT_ORDER, GENDERS, dayShort, time, flag, esc, athleteName } from '../format.js';
+import { statusBadge } from './common.js';
+
+const cache = new Map(); // raceId → risultato
+const PAGE = 8;
+const ui = { sport: null, shown: PAGE };
+
+async function loadResult(id) {
+  if (cache.has(id)) return cache.get(id);
+  const r = await api.result(id);
+  if (r.notFound) return null;
+  cache.set(id, r.data);
+  return r.data;
+}
+
+const isIta = (row) => row.nation === 'ITA' || row.members?.some((m) => m.nation === 'ITA');
+
+function podium(res) {
+  const top = res.rows.filter((r) => r.rank && r.rank <= 3).slice(0, 3);
+  if (!top.length) return '<p class="empty small">Podio non disponibile</p>';
+  return `<ol class="podium">${top.map((r) => `
+    <li class="p${r.rank} ${isIta(r) ? 'ita' : ''}">
+      <span class="medal">${['🥇', '🥈', '🥉'][r.rank - 1]}</span>
+      <span class="who">${flag(r.nation)} ${esc(res.isRelay ? r.name : athleteName(r.name))}</span>
+      <span class="res">${esc(r.gap || r.time || (r.points ?? ''))}</span>
+    </li>`).join('')}</ol>`;
+}
+
+function fullTable(res) {
+  const showShoot = res.race.sport === 'biathlon';
+  const rows = res.rows.map((r) => {
+    const members = res.isRelay && r.members?.length
+      ? `<div class="members">${r.members.map((m) => `<span class="${m.nation === 'ITA' ? 'ita-txt' : ''}">${m.leg}. ${esc(athleteName(m.name))}${m.shooting ? ` <small>(${esc(m.shooting)})</small>` : ''}</span>`).join('')}</div>`
+      : '';
+    return `<tr class="${isIta(r) ? 'ita' : ''}">
+      <td class="pos">${r.rank ?? `<small>${esc(r.status || '')}</small>`}</td>
+      <td class="ath">${flag(r.nation)} <b>${esc(res.isRelay ? r.name : athleteName(r.name))}</b> <small class="nat">${esc(r.nation)}</small>${members}</td>
+      ${showShoot ? `<td class="sh"><small>${esc(r.extra?.shooting || '')}</small></td>` : ''}
+      <td class="tm">${r.rank === 1 ? esc(r.time || '') : esc(r.gap || r.time || '')}${r.points != null ? esc(r.points) : ''}</td>
+      <td class="pts">${r.cupPoints ?? ''}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="table-wrap"><table class="results">
+    <thead><tr><th>#</th><th>Atleta</th>${showShoot ? '<th>Tiro</th>' : ''}<th>Tempo</th><th title="Punti Coppa del Mondo">Pt</th></tr></thead>
+    <tbody>${rows}</tbody></table></div>`;
+}
+
+function cardHead(race) {
+  return `<header class="rc-head sport-${race.sport}">
+    <div><b>${esc(race.disciplineName)}</b> <span class="g g-${race.gender}">${GENDERS[race.gender]}</span></div>
+    <div class="race-sub">${dayShort(race.startUtc)} · ${time(race.startUtc)} · ${flag(race.country)} ${esc(race.location)}</div>
+    ${race.status === 'live' ? statusBadge('live') : ''}
+  </header>`;
+}
+
+async function fillCard(card, race, { expanded = false } = {}) {
+  const body = card.querySelector('.rc-body');
+  try {
+    const res = await loadResult(race.id);
+    if (!res) { body.innerHTML = '<p class="empty small">Risultati non ancora disponibili.</p>'; return; }
+    const itaCount = res.rows.filter(isIta).length;
+    body.innerHTML = `${podium(res)}
+      <button class="btn wide toggle" aria-expanded="${expanded}">${expanded ? 'Nascondi classifica' : `Classifica completa (${res.rows.length})`}${itaCount ? ` · 🇮🇹 ${itaCount}` : ''}</button>
+      <div class="full" ${expanded ? '' : 'hidden'}>${fullTable(res)}
+        ${res.final ? '' : '<p class="note">Risultati provvisori</p>'}
+        <p class="note"><a href="${esc(res.race.source?.url)}" target="_blank" rel="noopener">Fonte ufficiale ↗</a></p></div>`;
+    const btn = body.querySelector('.toggle');
+    const full = body.querySelector('.full');
+    btn.addEventListener('click', () => {
+      full.hidden = !full.hidden;
+      btn.setAttribute('aria-expanded', String(!full.hidden));
+      btn.textContent = full.hidden ? `Classifica completa (${res.rows.length})${itaCount ? ` · 🇮🇹 ${itaCount}` : ''}` : 'Nascondi classifica';
+    });
+  } catch (e) {
+    body.innerHTML = `<p class="empty small">Errore nel caricamento (${esc(e.message)}).</p>`;
+  }
+}
+
+export function renderResults(view) {
+  const all = store.calendar.races.filter((r) => r.hasResults || r.status === 'finished' || r.status === 'live')
+    .sort((a, b) => Date.parse(b.startUtc) - Date.parse(a.startUtc));
+  const sportsWith = SPORT_ORDER.filter((s) => all.some((r) => r.sport === s));
+  if (!ui.sport) {
+    let saved = null;
+    try { saved = localStorage.getItem('ws:resSport'); } catch { /* ignore */ }
+    ui.sport = saved || sportsWith[0] || 'biathlon';
+  }
+  const races = all.filter((r) => r.sport === ui.sport);
+
+  view.innerHTML = `
+    <div class="segmented sports" role="tablist">${SPORT_ORDER.map((s) => `
+      <button role="tab" class="sport-${s} ${s === ui.sport ? 'on' : ''}" aria-selected="${s === ui.sport}" data-s="${s}">${SPORTS[s].icon} ${SPORTS[s].short}</button>`).join('')}</div>
+    <div id="cards">${races.length ? '' : `<p class="empty">Nessun risultato per ${SPORTS[ui.sport].name}.<br><small>I risultati compaiono qui appena le gare si concludono.</small></p>`}</div>
+    ${races.length > ui.shown ? `<button class="btn wide" id="more">Gare precedenti</button>` : ''}`;
+
+  view.querySelectorAll('[data-s]').forEach((b) => b.addEventListener('click', () => {
+    ui.sport = b.dataset.s; ui.shown = PAGE;
+    try { localStorage.setItem('ws:resSport', ui.sport); } catch { /* ignore */ }
+    renderResults(view);
+  }));
+  view.querySelector('#more')?.addEventListener('click', () => { ui.shown += PAGE; renderResults(view); });
+
+  const box = view.querySelector('#cards');
+  for (const race of races.slice(0, ui.shown)) {
+    const card = document.createElement('article');
+    card.className = 'result-card';
+    card.innerHTML = `<a class="rc-link" href="#/risultati/${encodeURIComponent(race.id)}">${cardHead(race)}</a><div class="rc-body"><p class="loading small">…</p></div>`;
+    box.appendChild(card);
+    fillCard(card, race);
+  }
+}
+
+export async function renderResultDetail(view, id) {
+  let race = raceById(id);
+  view.innerHTML = `<a class="back" href="#/risultati">‹ Tutti i risultati</a><article class="result-card detail"><div class="rc-top"></div><div class="rc-body"><p class="loading small">Caricamento…</p></div></article>`;
+  const card = view.querySelector('.result-card');
+  if (!race) {
+    const res = await loadResult(id).catch(() => null);
+    race = res?.race;
+  }
+  if (!race) { card.querySelector('.rc-body').innerHTML = '<p class="empty">Gara non trovata.</p>'; return; }
+  card.querySelector('.rc-top').innerHTML = cardHead(race);
+  await fillCard(card, race, { expanded: true });
+}

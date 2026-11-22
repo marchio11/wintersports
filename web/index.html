@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Neve 26/27</title>
+  <meta name="description" content="Calendario e risultati di Coppa del Mondo 2026/27: biathlon, sci alpino, sci di fondo, salto con gli sci.">
+  <meta name="theme-color" content="#0f1b2d">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1 class="brand">❄️ Neve <span>26/27</span></h1>
+    <div id="sync" class="sync" aria-live="polite"></div>
+  </header>
+
+  <main id="view" class="view" tabindex="-1">
+    <p class="loading">Caricamento…</p>
+  </main>
+
+  <nav class="tabbar" aria-label="Sezioni">
+    <a href="#/calendario" data-tab="calendario"><span class="ico" aria-hidden="true">📅</span>Calendario</a>
+    <a href="#/risultati" data-tab="risultati"><span class="ico" aria-hidden="true">🏁</span>Risultati</a>
+    <a href="#/coppa" data-tab="coppa"><span class="ico" aria-hidden="true">🏆</span>Coppa</a>
+  </nav>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
