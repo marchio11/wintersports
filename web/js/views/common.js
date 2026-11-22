@@ -45,7 +45,7 @@ export function raceRow(r) {
     : (r.series ? `<span class="badge comp">${esc(r.series)}</span>` : '');
   return `
   <a class="race sport-${r.sport} ${r.status} ${clickable ? '' : 'noresult'}" href="#/risultati/${encodeURIComponent(r.id)}" data-id="${esc(r.id)}">
-    <div class="race-time">${r.timeTbc ? 'da def.' : time(r.startUtc)}</div>
+    <div class="race-time${r.timeTbc ? ' tbc' : ''}">${r.timeTbc ? 'ora<br>da def.' : time(r.startUtc)}</div>
     <div class="race-main">
       <div class="race-title">
         <span class="g g-${r.gender}">${GENDER_SHORT[r.gender]}</span>

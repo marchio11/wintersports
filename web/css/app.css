@@ -119,6 +119,7 @@ h3.day b { color: var(--text); }
 .race.cancelled { opacity: .55; }
 .race.cancelled .race-title { text-decoration: line-through; }
 .race-time { font-weight: 700; font-variant-numeric: tabular-nums; text-align: center; font-size: 1.02rem; }
+.race-time.tbc { font-size: .68rem; font-weight: 600; color: var(--muted); line-height: 1.2; text-transform: uppercase; letter-spacing: .02em; }
 .race-title { font-weight: 600; font-size: .95rem; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .race-sub { color: var(--muted); font-size: .8rem; margin-top: 2px; }
 .g { font-size: .68rem; font-weight: 700; border-radius: 6px; padding: 1px 6px; background: var(--surface-2); color: var(--muted); }
