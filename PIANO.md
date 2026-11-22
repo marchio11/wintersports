@@ -241,5 +241,5 @@ sicuro nell'ambiente (mai in chat). Passi manuali alternativi nel README.
 
 ## 8. Decisioni prese
 - **Biathlon**: fonte = sito ufficiale IBU biathlonworld.com (vedi §1). Se in futuro l'IBU concedesse una chiave API personale, basterà sostituire `worker/src/sources/biathlon.js`.
-- **Hosting**: Cloudflare (Worker + Static Assets) invece di GitHub Pages, per avere tutto in un posto come le altre webapp.
+- **Hosting**: PWA su **Cloudflare Pages** (`wintersports-marchio11.pages.dev`, collegato a GitHub come le altre webapp); dati e cron sul Worker `wintersports`.
 - **Deploy**: lo fa Claude con un API token Cloudflare fornito dall'utente.

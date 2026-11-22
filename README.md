@@ -21,9 +21,12 @@ worker/        Cloudflare Worker (API + cron)
 web/           PWA servita dal Worker
 ```
 
-## Indirizzo dell'app
+## Indirizzi
 
-**https://wintersports.andrea-marchionni11.workers.dev**
+- **App**: **https://wintersports-marchio11.pages.dev** — progetto Cloudflare Pages collegato a GitHub
+  (cartella `web/`, nessun comando di build): ogni push sul branch di produzione la ripubblica da solo.
+- **Dati/API**: https://wintersports.andrea-marchionni11.workers.dev (Worker con cron e KV). Serve anche
+  una copia della PWA, utile come riserva.
 
 ## Configurazione di Cloudflare (passo passo)
 
