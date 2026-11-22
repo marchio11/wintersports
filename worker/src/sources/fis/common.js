@@ -136,6 +136,15 @@ const SECTION_STATUS = [
   [/lapped/i, 'LAP'],
 ];
 
+// intestazioni di sezione che indicano una fase della gara, non un ritiro
+const PHASES = [
+  [/^final$/i, 'Finale'],
+  [/^small final$/i, 'Finale B'],
+  [/^semi-?final$/i, 'Semifinale'],
+  [/^(1\/4 final|quarter-?final)$/i, 'Quarti di finale'],
+  [/^qualification$/i, 'Qualificazione'],
+];
+
 function sectionStatus(title) {
   for (const [re, st] of SECTION_STATUS) if (re.test(title)) return st;
   return 'NC';
@@ -158,16 +167,20 @@ export function resultRows(html) {
   const out = [];
   let status = null;
   let statusDetail = null;
+  let phase = null;
   for (let ci = 0; ci < chunks.length; ci++) {
     const chunk = chunks[ci];
     if (ci > 0) {
       const t = decode(chunk.match(/<div class="g-xs-24 bold">([^<]+)<\/div>/)?.[1] || '');
-      if (t) { status = sectionStatus(t); statusDetail = t; }
+      if (t && PHASES.some(([re]) => re.test(t))) {
+        // batterie della sprint (Final, Semifinal, 1/4 Final, Qualification): atleti classificati
+        status = null; statusDetail = null; phase = PHASES.find(([re]) => re.test(t))[1];
+      } else if (t) { status = sectionStatus(t); statusDetail = t; phase = null; }
     }
     for (const r of chunk.split(/<a class="table-row[\s"]/).slice(1)) {
       const basics = rowBasics(r);
       if (!basics.name) continue;
-      out.push({ html: r, status, statusDetail: status ? statusDetail : null, basics });
+      out.push({ html: r, status, statusDetail: status ? statusDetail : null, phase, basics });
     }
   }
   return out;

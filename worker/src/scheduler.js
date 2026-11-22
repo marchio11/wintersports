@@ -7,11 +7,13 @@ import { updateBiathlon } from './updaters/biathlon.js';
 import { makeFisUpdater } from './updaters/fis.js';
 import * as alpine from './sources/fis/alpine.js';
 import * as jumping from './sources/fis/jumping.js';
+import * as crosscountry from './sources/fis/crosscountry.js';
 
 const UPDATERS = {
   [SPORTS.BIATHLON]: updateBiathlon,
   [SPORTS.ALPINE]: makeFisUpdater(alpine),
   [SPORTS.JUMPING]: makeFisUpdater(jumping),
+  [SPORTS.CROSSCOUNTRY]: makeFisUpdater(crosscountry),
 };
 
 const QUIET_INTERVAL_MS = 30 * 60e3 - 60e3; // ~30 minuti nei giorni senza gare

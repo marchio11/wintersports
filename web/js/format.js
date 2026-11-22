@@ -74,6 +74,25 @@ export function flag(ioc) {
   return String.fromCodePoint(...[...iso].map((c) => 0x1f1a5 + c.charCodeAt(0)));
 }
 
+const regionNames = (() => {
+  try { return new Intl.DisplayNames(['it'], { type: 'region' }); } catch { return null; }
+})();
+
+/** Nome della nazione in italiano dal codice IOC/FIS (es. NOR → Norvegia). */
+export function countryName(ioc) {
+  const iso = IOC_TO_ISO[ioc];
+  if (!iso || !regionNames) return null;
+  try { return regionNames.of(iso); } catch { return null; }
+}
+
+/** Nome di una squadra: "SWEDEN I" → "Svezia I", "NORWAY" → "Norvegia". */
+export function teamName(row) {
+  const suffix = row.name?.match(/\s+(I{1,3}|IV|V|VI)$/)?.[1];
+  const c = countryName(row.nation);
+  if (!c) return row.name;
+  return suffix ? `${c} ${suffix}` : c;
+}
+
 export function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }

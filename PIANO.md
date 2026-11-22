@@ -214,8 +214,8 @@ Codici nazione IOC/FIS a 3 lettere (`ITA`). `sport` ∈ `alpine | biathlon | cro
 ## 6. Fasi
 1. ✅ **Worker + biathlon + frontend base**
 2. ✅ **Sci alpino** (anticipato su richiesta: Coppa del Mondo + Mondiali di Crans-Montana, prove escluse)
-3. Sci di fondo
-4. Salto con gli sci
+3. ✅ **Salto con gli sci** (WC + Mondiali di Falun; qualificazioni e Four Hills esclusi. Nota: FIS non pubblica l'HS nelle pagine HTML, si mostra il tipo di trampolino)
+4. ✅ **Sci di fondo** (WC + Tour de Ski + Mondiali di Falun; qualificazioni sprint escluse, batterie della sprint mostrate)
 5. Classifiche di Coppa, rifiniture grafiche, PWA completa
 
 Alla fine di ogni fase: commit sul branch, istruzioni per provarla, stop per i tuoi test.

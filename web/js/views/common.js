@@ -40,7 +40,9 @@ export function statusBadge(status) {
 
 export function raceRow(r) {
   const clickable = r.hasResults || r.status === 'finished' || r.status === 'live';
-  const comp = r.competition !== 'WC' ? `<span class="badge comp">${COMPETITIONS[r.competition] || r.competition}</span>` : '';
+  const comp = r.competition !== 'WC'
+    ? `<span class="badge comp">${COMPETITIONS[r.competition] || r.competition}</span>`
+    : (r.series ? `<span class="badge comp">${esc(r.series)}</span>` : '');
   return `
   <a class="race sport-${r.sport} ${r.status} ${clickable ? '' : 'noresult'}" href="#/risultati/${encodeURIComponent(r.id)}" data-id="${esc(r.id)}">
     <div class="race-time">${r.timeTbc ? 'da def.' : time(r.startUtc)}</div>
