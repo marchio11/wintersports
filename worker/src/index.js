@@ -3,12 +3,12 @@
 
 import { KEYS, ALL_SPORTS, SEASON, sortRaces } from './schema.js';
 import { getJson } from './store.js';
-import { runTick } from './scheduler.js';
+import { runTick, MANUAL_MIN_INTERVAL_MS } from './scheduler.js';
 import { serveStatic } from './assets.js';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
@@ -59,6 +59,18 @@ export default {
       if (!authorized(request, env)) return json({ error: 'non autorizzato' }, 401);
       const result = await runTick(env, { force: true });
       return json(result, 200, 0);
+    }
+
+    // Pulsante "Aggiorna" dell'app: aggiornamento immediato, al massimo ogni 5 minuti
+    if ((path === '/refresh' || path === '/api/refresh') && request.method === 'POST') {
+      const state = await getJson(env.KV, KEYS.state, {});
+      const last = state.lastWorkAt || 0;
+      if (Date.now() - last < MANUAL_MIN_INTERVAL_MS) {
+        return json({ refreshed: false, lastWorkAt: new Date(last).toISOString(), retryAfterSec: Math.ceil((last + MANUAL_MIN_INTERVAL_MS - Date.now()) / 1000) }, 200, 0);
+      }
+      const r = await runTick(env, { force: true });
+      const ok = Object.values(r.report || {}).every((x) => x.ok);
+      return json({ refreshed: true, ok, lastWorkAt: new Date().toISOString() }, 200, 0);
     }
 
     if (request.method !== 'GET' && request.method !== 'HEAD') return json({ error: 'metodo non consentito' }, 405);

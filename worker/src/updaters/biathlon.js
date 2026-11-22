@@ -5,9 +5,10 @@ import { getJson, putIfChanged } from '../store.js';
 import { fetchText } from '../http.js';
 import { BASE, parseCalendarPage, parseResultPage, candidateRaceIds } from '../sources/biathlon.js';
 import { mergeRace, raceIdsNeedingResults } from './common.js';
+import { computeBiathlonStandings } from './biathlon-standings.js';
 
 const SPORT = SPORTS.BIATHLON;
-const SWEEP_EVERY_MS = 20 * 3600e3; // una scansione completa delle tappe al giorno
+const SWEEP_EVERY_MS = 3 * 24 * 3600e3; // ricerca delle gare future: ogni 3 giorni, solo quelle non ancora note
 
 export { mergeRace, raceIdsNeedingResults };
 
@@ -66,7 +67,8 @@ export async function updateBiathlon(ctx) {
   // 3) Scoperta anticipata delle gare delle tappe future (a rotazione, una volta al giorno)
   const pairs = events
     .filter((e) => Date.parse(e.endUtc) > now - 24 * 3600e3)
-    .flatMap((e) => candidateRaceIds(e.eventId));
+    .flatMap((e) => candidateRaceIds(e.eventId))
+    .filter((id) => !byId.has(`ibu-${id}`));
   const sweepDue = !st.sweepDoneAt || now - st.sweepDoneAt > SWEEP_EVERY_MS;
   if (pairs.length && (sweepDue || st.sweepCursor)) {
     let cursor = st.sweepCursor || 0;
@@ -93,6 +95,17 @@ export async function updateBiathlon(ctx) {
   // 4) Salva il calendario solo se è cambiato
   const races = sortRaces([...byId.values()]);
   if (races.length) stats.calendarWritten = await putIfChanged(kv, KEYS.calendar(SPORT), races, stored);
+
+  // 5) Classifiche di Coppa (calcolate) dopo nuovi risultati, o una volta al giorno
+  if (stats.resultsWritten > 0 || !st.standingsAt || now - st.standingsAt > 24 * 3600e3) {
+    try {
+      const std = await computeBiathlonStandings(kv, races, now);
+      await putIfChanged(kv, KEYS.standings(SPORT), std);
+      st.standingsAt = now;
+    } catch (e) {
+      errors.push(`classifiche: ${e.message}`);
+    }
+  }
 
   stats.pending = !st.sweepDoneAt || !!st.sweepCursor;
   const ok = errors.length === 0 || (stats.fetched > errors.length);

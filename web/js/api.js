@@ -22,7 +22,7 @@ function writeCache(path, data) {
  */
 export async function getJson(path) {
   try {
-    const res = await fetch(API_BASE + path, { headers: { Accept: 'application/json' } });
+    const res = await fetch(API_BASE + path, { headers: { Accept: 'application/json' }, cache: 'no-cache' });
     if (res.status === 404) return { data: null, notFound: true };
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
@@ -35,7 +35,15 @@ export async function getJson(path) {
   }
 }
 
+/** Chiede al server un aggiornamento immediato dalle fonti (max ogni 5 minuti). */
+async function refresh() {
+  const res = await fetch(API_BASE + '/refresh', { method: 'POST' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
 export const api = {
+  refresh,
   calendar: () => getJson('/calendar'),
   result: (raceId) => getJson(`/results/${encodeURIComponent(raceId)}`),
   standings: (sport) => getJson(`/standings/${sport}`),

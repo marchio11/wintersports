@@ -44,7 +44,12 @@ Hosting: tutto su Cloudflare (come le altre webapp), un solo deploy, stesso domi
 | KV: 1.000 scritture/giorno, 100.000 letture/giorno | Si scrive **solo se il contenuto è cambiato** (hash confrontato). 144 tick/giorno × poche chiavi = ampio margine. Le letture del frontend passano dalla Cache API del Worker (60 s). |
 | Cron trigger: max 5 per account | **Un solo** cron ogni 10 min; il Worker decide da sé se lavorare. |
 
-### Logica di aggiornamento (un unico cron ogni 10 minuti)
+### Logica di aggiornamento (aggiornata: cron ogni 30 minuti)
+- **Finestre di gara** (da 15' prima della partenza fino ai risultati salvati, max 4 ore): aggiornamento a ogni tick (30 min).
+- **Fuori dalle gare**: un aggiornamento ogni ~3 ore.
+- **Pulsante "Aggiorna"** nell'app (`POST /refresh`): aggiornamento immediato, al massimo ogni 5 minuti.
+
+Logica originale (superata):
 1. Legge `meta:state` da KV.
 2. **Giorno di gara** (almeno una gara oggi in ora italiana, o una gara "in corso"): lavora a ogni tick (10 min).
    Altrimenti lavora solo se l'ultimo aggiornamento ha più di 30 min.
@@ -216,7 +221,7 @@ Codici nazione IOC/FIS a 3 lettere (`ITA`). `sport` ∈ `alpine | biathlon | cro
 2. ✅ **Sci alpino** (anticipato su richiesta: Coppa del Mondo + Mondiali di Crans-Montana, prove escluse)
 3. ✅ **Salto con gli sci** (WC + Mondiali di Falun; qualificazioni e Four Hills esclusi. Nota: FIS non pubblica l'HS nelle pagine HTML, si mostra il tipo di trampolino)
 4. ✅ **Sci di fondo** (WC + Tour de Ski + Mondiali di Falun; qualificazioni sprint escluse, batterie della sprint mostrate)
-5. Classifiche di Coppa, rifiniture grafiche, PWA completa
+5. ✅ **Classifiche di Coppa** (FIS ufficiali per alpino/fondo/salto, calcolate per il biathlon) + **Tournée dei 4 trampolini**, HS nel nome delle gare di salto, aggiornamenti calibrati sulle gare + pulsante "Aggiorna", service worker completa
 
 Alla fine di ogni fase: commit sul branch, istruzioni per provarla, stop per i tuoi test.
 Ogni parser ha test automatici su pagine reali salvate, così un cambio di layout FIS si nota subito.

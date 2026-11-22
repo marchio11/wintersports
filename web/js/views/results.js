@@ -5,6 +5,7 @@ import { SPORTS, SPORT_ORDER, GENDERS, dayShort, time, flag, esc, athleteName, t
 import { statusBadge } from './common.js';
 
 const cache = new Map(); // raceId → risultato
+export function clearResultsCache() { cache.clear(); }
 const PAGE = 8;
 const ui = { sport: null, shown: PAGE };
 

@@ -260,3 +260,48 @@ export function startOf(d) {
 /** Punti di Coppa del Mondo per posizione (gare individuali di salto e fondo). */
 export const WC_POINTS = [100, 80, 60, 50, 45, 40, 36, 32, 29, 26, 24, 22, 20, 18, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
 export const cupPointsFor = (rank) => (rank && rank <= 30 ? WC_POINTS[rank - 1] : null);
+
+export const standingsUrl = (sector, season, gender) =>
+  `${FIS}/${SECTOR_PATH[sector]}/cup-standings.html?sectorcode=${sector}&seasoncode=${season}&cupcode=WC&disciplinecode=ALL&gendercode=${gender}`;
+
+const toPoints = (s) => {
+  const v = parseInt(String(s).replace(/['’.\s]/g, ''), 10);
+  return Number.isFinite(v) ? v : null;
+};
+
+/**
+ * Pagina classifiche di Coppa FIS (un genere): ogni atleta ha un blocco per classifica
+ * (ALL = generale, poi le specialità) con posizione e punti.
+ * Ritorna { [codice]: [{ rank, athleteId, name, nation, points }] } ordinati per posizione.
+ */
+export function parseCupStandings(html) {
+  // se la Coppa del Mondo non ha ancora una classifica, FIS mostra in silenzio un'altra coppa
+  const selected = [...html.matchAll(/<option[^>]*selected[^>]*>\s*([^<]*?)\s*<\/option>/gi)].map((m) => m[1]);
+  if (selected.length && !selected.some((t) => /world cup/i.test(t))) return {};
+  const start = html.indexOf('athlete-biography');
+  if (start < 0) return {};
+  const body = html.slice(html.lastIndexOf('class="table__body', start) > 0 ? html.lastIndexOf('class="table__body', start) : 0);
+  const out = {};
+  for (const r of body.split(/class="table-row[\s"]/).slice(1)) {
+    const name = r.match(/justify-left bold align-xs-top">\s*(?:<a [^>]*>)?\s*([^<]+?)\s*</)?.[1];
+    if (!name) continue;
+    const nation = r.match(/country__name-short">([A-Z]{3})</)?.[1] || null;
+    const fisId = r.match(/competitorid=(\d+)/)?.[1];
+    const blocks = r.split(/<div class="g-xs-24 g-sm-24 g-md">/).slice(1);
+    for (const b of blocks) {
+      const code = b.match(/g-xs-9 hidden-sm-up justify-left">\s*([A-Z]+)\s*</)?.[1];
+      const rank = b.match(/g-lg-8 justify-right[^"]*">\s*(\d+)\s*</)?.[1];
+      const pts = b.match(/g-md-9 g-lg-8 justify-right[^"]*">\s*([\d'’.]+)\s*</)?.[1];
+      if (!code || !rank) continue;
+      (out[code] ||= []).push({ rank: parseInt(rank, 10), athleteId: fisId ? `fis-c${fisId}` : null, name: decode(name), nation, points: toPoints(pts) });
+    }
+  }
+  for (const c of Object.keys(out)) out[c].sort((a, b) => a.rank - b.rank);
+  return out;
+}
+
+/** Aggiunge il distacco dal primo. */
+export function withGaps(rows) {
+  const best = rows[0]?.points ?? 0;
+  return rows.map((r) => ({ ...r, gap: r.points != null && r.rank > 1 ? best - r.points : null }));
+}

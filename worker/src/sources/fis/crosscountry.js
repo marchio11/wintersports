@@ -7,6 +7,10 @@ export const SECTOR = 'CC';
 export const SPORT = SPORTS.CROSSCOUNTRY;
 export const SEASON_CODE = '2027';
 export const CATEGORIES = ['WC', 'WSC'];
+export const STANDING_LABELS = {
+  ALL: 'Generale', DI: 'Distanza', DIS: 'Distanza', SP: 'Sprint', SPR: 'Sprint', U23: 'Under 23',
+  TDS: 'Tour de Ski', BT: 'Bonus', MO: 'Bonus',
+};
 
 const km = (s) => `${s.replace('.', ',')} km`;
 

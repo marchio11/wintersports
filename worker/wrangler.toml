@@ -15,10 +15,10 @@ command = "node scripts/build-static.mjs"
 binding = "KV"
 id = "f9935efbaa8d4a60a19cbf3efde73542"
 
-# Un solo cron ogni 10 minuti: il Worker decide da sé se lavorare
-# (sempre nei giorni di gara, altrimenti ogni ~30 minuti).
+# Un solo cron ogni 30 minuti: il Worker decide da sé se lavorare
+# (a ogni tick durante le "finestre di gara", altrimenti ogni ~3 ore).
 [triggers]
-crons = ["*/10 * * * *"]
+crons = ["*/30 * * * *"]
 
 [vars]
 BUDGET_RESULTS = "4"

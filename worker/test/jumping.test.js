@@ -28,9 +28,10 @@ test('tappa Lillehammer: qualificazioni escluse, gara mista, gara in corso', () 
   const races = real.map((x) => jumping.toRace(x, ev, 'WC', NOW));
   const mixed = races.find((r) => r.source.raceId === '7794');
   assert.equal(mixed.gender, 'X');
-  assert.equal(mixed.disciplineName, 'Gara a squadre mista, trampolino grande');
+  assert.equal(mixed.disciplineName, 'Gara a squadre mista, trampolino grande HS140');
   const w = races.find((r) => r.source.raceId === '7799');
-  assert.equal(w.disciplineName, 'Trampolino grande');
+  assert.equal(w.disciplineName, 'Trampolino grande HS140');
+  assert.equal(w.hillSize, 140);
   assert.equal(w.discipline, 'LH');
   assert.equal(w.startUtc, '2026-11-21T13:35:00.000Z');
   assert.equal(w.status, 'finished');

@@ -1,19 +1,54 @@
 // Salto con gli sci (FIS sector JP): mappe specifiche e conversione nel formato comune.
-// Nota: le pagine FIS non riportano l'HS (hill size); si mostra il tipo di trampolino.
+// Nota: le pagine FIS non riportano l'HS (hill size), che si prende dalla tabella HILL_SIZES.
 import { SPORTS } from '../../schema.js';
-import { urls, startOf, resultRows, headerInfo, decode, cupPointsFor } from './common.js';
+import { urls, startOf, resultRows, headerInfo, decode, cupPointsFor, parseEventDetails } from './common.js';
+import { fetchText } from '../../http.js';
 import { statusOf } from './alpine.js';
 
 export const SECTOR = 'JP';
 export const SPORT = SPORTS.JUMPING;
 export const SEASON_CODE = '2027';
 export const CATEGORIES = ['WC', 'WSC'];
+export const STANDING_LABELS = {
+  ALL: 'Generale', SF: 'Volo', FL: 'Volo', RA: 'Raw Air', RAW: 'Raw Air', TNT: 'Two Nights Tour',
+};
 
 const HILLS = [
   [/flying hill|ski flying/i, 'FH', 'trampolino per il volo'],
   [/large hill/i, 'LH', 'trampolino grande'],
   [/normal hill/i, 'NH', 'trampolino normale'],
 ];
+
+// Hill size dei trampolini della stagione 2026/27 (fonte: documenti FIS, via Wikipedia).
+// Chiave: località (come mostrata nell'app) → { NH | LH | FH: HS }. Da aggiornare se cambia un trampolino.
+export const HILL_SIZES = {
+  'Lillehammer': { LH: 140 },
+  'Ruka': { LH: 142 },
+  'Hinzenbach': { NH: 90 },
+  'Wisła': { LH: 134 },
+  'Titisee-Neustadt': { LH: 142 },
+  'Engelberg': { LH: 140 },
+  'Oberstdorf': { LH: 137 },
+  'Garmisch-Partenkirchen': { LH: 142 },
+  'Innsbruck': { LH: 128 },
+  'Bischofshofen': { LH: 142 },
+  'Ljubno': { NH: 94, LH: 94 },
+  'Zhangjiakou': { LH: 140 },
+  'Zakopane': { LH: 140 },
+  'Zaō': { NH: 102, LH: 102 },
+  'Sapporo': { LH: 137 },
+  'Willingen': { LH: 147 },
+  'Lake Placid': { LH: 128 },
+  'Lahti': { LH: 130 },
+  'Vikersund': { FH: 240 },
+  'Villach': { NH: 98 },
+  'Oslo Holmenkollen': { LH: 134 },
+  'Planica': { FH: 240 },
+};
+
+export function hillSize(place, hillCode) {
+  return HILL_SIZES[place]?.[hillCode] ?? null;
+}
 
 export function mapDiscipline(text, gender) {
   const hill = HILLS.find(([re]) => re.test(text)) || [null, '', ''];
@@ -57,7 +92,12 @@ function genderOf(genders) {
 
 export function toRace(d, event, competition, now = Date.now()) {
   const gender = genderOf(d.genders);
-  const { discipline, disciplineName } = mapDiscipline(d.discipline, gender);
+  const mapped = mapDiscipline(d.discipline, gender);
+  const location = placeName(event.place);
+  const hillCode = HILLS.find(([re]) => re.test(d.discipline))?.[1];
+  const hs = hillCode ? hillSize(location, hillCode) : null;
+  const discipline = mapped.discipline;
+  const disciplineName = hs ? `${mapped.disciplineName} HS${hs}` : mapped.disciplineName;
   const { startUtc, timeTbc } = startOf(d);
   const status = statusOf({ ...d, startIso: timeTbc ? null : d.startIso }, now);
   return {
@@ -68,7 +108,8 @@ export function toRace(d, event, competition, now = Date.now()) {
     discipline,
     disciplineName,
     gender,
-    location: placeName(event.place),
+    hillSize: hs,
+    location,
     country: event.nation || null,
     startUtc,
     localTimezone: d.timezone,
@@ -155,3 +196,52 @@ export function toResult(parsed, race, now = Date.now()) {
 
 // il parser dei risultati è specifico del salto (punti e distanze, non tempi)
 export const parseResultsFor = parseJumpResults;
+
+const DAY = 24 * 3600e3;
+const FHT_LABEL = 'Tournée dei 4 trampolini';
+
+/**
+ * Classifica della Tournée dei 4 trampolini (Four Hills Tournament): FIS la pubblica
+ * come "risultato" della pseudo-tappa "FIS Four Hills Tournament".
+ */
+export async function extraStandings({ now, st, stats, prev }) {
+  const fht = Object.values(st.specialEvents || {}).find((e) => /four hills/i.test(e.place));
+  if (!fht) return [];
+  const old = [...prev.values()].filter((x) => x.group === 'fourhills');
+  const start = Date.parse(`${fht.start}T00:00:00Z`);
+  const end = Date.parse(`${fht.end}T23:59:59Z`);
+  const meta = { group: 'fourhills', label: FHT_LABEL, start: fht.start, end: fht.end };
+  const placeholder = (g, gl) => ({ id: `fourhills-${g}`, gender: g, genderLabel: gl, discipline: 'FHT', ...meta, rows: [] });
+  const inWindow = now >= start - DAY && now <= end + 3 * DAY;
+  if (!inWindow) {
+    if (old.length) return old;
+    return [placeholder('M', 'Uomini'), placeholder('F', 'Donne')];
+  }
+  const out = [];
+  try {
+    const ev = await fetchText(urls.event(SECTOR, fht.eventId, SEASON_CODE));
+    stats.fetched++;
+    const races = ev.ok ? parseEventDetails(ev.text).races : [];
+    for (const [fisG, g, gl] of [['M', 'M', 'Uomini'], ['W', 'F', 'Donne']]) {
+      const race = races.find((r) => r.genders.length === 1 && r.genders[0] === fisG);
+      let rows = [];
+      if (race) {
+        const res = await fetchText(urls.results(SECTOR, race.raceId));
+        stats.fetched++;
+        const parsed = res.ok ? parseJumpResults(res.text) : null;
+        if (parsed) {
+          const best = parsed.rows[0]?.points;
+          rows = parsed.rows.filter((r) => r.rank).map((r) => ({
+            rank: r.rank, athleteId: r.athleteId, name: r.name, nation: r.nation, points: r.points,
+            gap: r.rank > 1 && best != null && r.points != null ? Math.round((best - r.points) * 10) / 10 : null,
+          }));
+        }
+      }
+      const prevG = old.find((x) => x.gender === g);
+      out.push(rows.length ? { ...placeholder(g, gl), rows } : (prevG || placeholder(g, gl)));
+    }
+  } catch {
+    return old.length ? old : [placeholder('M', 'Uomini'), placeholder('F', 'Donne')];
+  }
+  return out;
+}

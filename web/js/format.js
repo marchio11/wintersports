@@ -115,5 +115,7 @@ export function ago(ts) {
   const min = Math.round((Date.now() - ts) / 60000);
   if (min < 1) return 'adesso';
   if (min < 60) return `${min} min fa`;
-  return `alle ${time(new Date(ts).toISOString())}`;
+  const iso = new Date(ts).toISOString();
+  const rel = relativeDay(dayKey(ts));
+  return rel === 'Oggi' ? `alle ${time(iso)}` : `${rel ? rel.toLowerCase() : dayShort(ts)} alle ${time(iso)}`;
 }

@@ -6,6 +6,10 @@ export const SECTOR = 'AL';
 export const SPORT = SPORTS.ALPINE;
 export const SEASON_CODE = '2027';
 export const CATEGORIES = ['WC', 'WSC'];
+export const STANDING_LABELS = {
+  ALL: 'Generale', DH: 'Discesa libera', SG: 'Super-G', GS: 'Slalom gigante', SL: 'Slalom',
+  AC: 'Combinata', SC: 'Combinata', PAR: 'Parallelo', PGS: 'Parallelo',
+};
 
 const DISCIPLINES = [
   [/^downhill$/i, 'DH', 'Discesa libera'],

@@ -6,13 +6,14 @@
 import { KEYS, sortRaces, isValidRace } from '../schema.js';
 import { getJson, putIfChanged } from '../store.js';
 import { fetchText } from '../http.js';
-import { urls, parseCalendar, parseEventDetails, parseResults } from '../sources/fis/common.js';
+import { urls, parseCalendar, parseEventDetails, parseResults, standingsUrl, parseCupStandings, withGaps } from '../sources/fis/common.js';
 import { mergeRace, raceIdsNeedingResults } from './common.js';
 
 const DAY = 24 * 3600e3;
 const CALENDAR_EVERY = 6 * 3600e3;   // il calendario cambia raramente
 const HOT_EVERY = 9 * 60e3;          // tappe in corso / imminenti: a ogni tick
 const COLD_EVERY = DAY;              // tutte le altre: una volta al giorno
+const STANDINGS_EVERY = 12 * 3600e3;
 
 const dayMs = (iso) => (iso ? Date.parse(`${iso}T12:00:00Z`) : NaN);
 
@@ -48,7 +49,7 @@ export function makeFisUpdater(mod) {
     const byId = new Map(stored.map((r) => [r.id, r]));
 
     // 1) Calendario (tappe) per ogni categoria: WC, WSC…
-    if (!st.events || !st.calendarAt || now - st.calendarAt > CALENDAR_EVERY) {
+    if (!st.events || !st.calendarAt || now - st.calendarAt > CALENDAR_EVERY || (mod.isRealEvent && !st.specialEvents)) {
       const merged = new Map((st.events || []).map((e) => [e.eventId, e]));
       let okCount = 0;
       for (const cat of mod.CATEGORIES) {
@@ -62,7 +63,11 @@ export function makeFisUpdater(mod) {
             throw e;
           }
           for (const e of events) {
-            if (mod.isRealEvent && !mod.isRealEvent(e)) continue;
+            if (mod.isRealEvent && !mod.isRealEvent(e)) {
+              // "tappe" speciali (es. Four Hills, Tour de Ski): servono solo per le classifiche
+              (st.specialEvents ||= {})[e.eventId] = { ...e, competition: cat };
+              continue;
+            }
             merged.set(e.eventId, { ...e, competition: cat });
           }
           okCount++;
@@ -124,7 +129,17 @@ export function makeFisUpdater(mod) {
       }
     }
 
-    // 4) Salva il calendario solo se cambiato
+    // 4) Classifiche di Coppa: dopo nuovi risultati, altrimenti due volte al giorno
+    if (stats.resultsWritten > 0 || !st.standingsAt || now - st.standingsAt > STANDINGS_EVERY) {
+      try {
+        const written = await updateStandings(mod, ctx, st, stats);
+        if (written) st.standingsAt = now;
+      } catch (e) {
+        errors.push(`classifiche: ${e.message}`);
+      }
+    }
+
+    // 5) Salva il calendario solo se cambiato
     const races = sortRaces([...byId.values()]);
     if (races.length) stats.calendarWritten = await putIfChanged(kv, key, races, stored);
     if (errors.length) log(`${mod.SPORT} errors`, errors.join(' | '));
@@ -134,4 +149,43 @@ export function makeFisUpdater(mod) {
     const ok = errors.length === 0 || stats.fetched > errors.length;
     return { ok, error: errors.slice(0, 5).join(' | ') || undefined, stats };
   };
+}
+
+const GENDERS = [['M', 'M', 'Uomini'], ['W', 'F', 'Donne']];
+
+/** Scarica le classifiche di Coppa (uomini e donne) e le salva in std:<sport>. */
+async function updateStandings(mod, ctx, st, stats) {
+  const { kv, now } = ctx;
+  const key = KEYS.standings(mod.SPORT);
+  const prev = await getJson(kv, key, null);
+  const prevById = new Map((prev?.standings || []).map((x) => [x.id, x]));
+  const list = [];
+  let fetchedAny = false;
+  for (const [fisG, g, gLabel] of GENDERS) {
+    let byCode = null;
+    try {
+      const res = await fetchText(standingsUrl(mod.SECTOR, mod.SEASON_CODE, fisG));
+      stats.fetched++;
+      if (res.ok) byCode = parseCupStandings(res.text);
+    } catch { /* si tengono quelle salvate */ }
+    if (byCode) {
+      fetchedAny = true;
+      const codes = Object.keys(byCode).sort((a, b) => (a === 'ALL' ? -1 : b === 'ALL' ? 1 : 0));
+      for (const code of codes) {
+        const label = mod.STANDING_LABELS?.[code] || code;
+        list.push({ id: `${code}-${g}`, label, gender: g, genderLabel: gLabel, discipline: code, rows: withGaps(byCode[code]) });
+      }
+    } else {
+      for (const x of prevById.values()) if (x.gender === g && !x.group) list.push(x);
+    }
+  }
+  // classifiche extra specifiche dello sport (es. Tournée dei 4 trampolini)
+  if (mod.extraStandings) {
+    const extra = await mod.extraStandings({ ...ctx, st, stats, prev: prevById });
+    list.push(...extra);
+  }
+  if (!list.length && !fetchedAny) return null;
+  const data = { sport: mod.SPORT, source: 'fis', updatedAt: new Date(now).toISOString(), standings: list };
+  await putIfChanged(kv, key, data, prev);
+  return fetchedAny;
 }

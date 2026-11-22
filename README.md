@@ -4,8 +4,8 @@ PWA personale per seguire la Coppa del Mondo 2026/27 di **biathlon**, sci alpino
 Interfaccia in italiano, orari sempre in **ora italiana**.
 
 - **Backend + sito**: un unico Cloudflare Worker (piano gratuito) che
-  - ogni 10 minuti scarica i dati dalle fonti, li normalizza e li salva in **KV**;
-  - espone le API JSON `GET /calendar`, `GET /results/:raceId`, `GET /standings/:sport`, `GET /health` (con CORS);
+  - scarica i dati dalle fonti ogni 30 minuti durante le gare e ogni ~3 ore negli altri momenti, li normalizza e li salva in **KV** (più il pulsante "Aggiorna" nell'app, max ogni 5 minuti);
+  - espone le API JSON `GET /calendar`, `GET /results/:raceId`, `GET /standings/:sport`, `GET /health`, `POST /refresh` (con CORS);
   - serve i file statici della PWA (cartella `web/`), incorporati nel Worker a ogni build da `worker/scripts/build-static.mjs`.
 - **Frontend**: HTML/CSS/JavaScript puro, senza build (cartella `web/`).
 
@@ -58,8 +58,8 @@ Forza subito un aggiornamento senza aspettare il cron.
 
 ### 4. Controllare che funzioni
 - `https://…workers.dev/health` → stato delle fonti e ora dell'ultimo aggiornamento.
-- `npx wrangler tail` → log in tempo reale del cron (una riga `tick` ogni 10 minuti).
-- Dashboard Cloudflare → *Workers & Pages → wintersports → Settings → Triggers*: c'è il cron `*/10 * * * *`.
+- `npx wrangler tail` → log in tempo reale del cron (una riga `tick` ogni 30 minuti).
+- Dashboard Cloudflare → *Workers & Pages → wintersports → Settings → Triggers*: c'è il cron `*/30 * * * *`.
 
 ### Limiti del piano gratuito (rispettati)
 | Limite | Uso previsto |

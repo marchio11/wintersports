@@ -55,11 +55,17 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* Barra in alto */
 .topbar {
   position: sticky; top: 0; z-index: 10; background: var(--top); color: var(--top-text);
-  padding: calc(10px + env(safe-area-inset-top)) 16px 10px; display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  padding: calc(10px + env(safe-area-inset-top)) 16px 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px;
 }
 .brand { margin: 0; font-size: 1.15rem; letter-spacing: .2px; }
 .brand span { opacity: .7; font-weight: 500; }
 .sync { font-size: .75rem; opacity: .75; white-space: nowrap; }
+.top-right { display: flex; align-items: center; gap: 8px; }
+.refresh { border: 1px solid rgb(255 255 255 / .25); background: transparent; color: var(--top-text); width: 34px; height: 34px; border-radius: 50%; font-size: 1.15rem; line-height: 1; padding: 0; }
+.refresh.spin { animation: spin 1s linear infinite; opacity: .7; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.chip.special { border-style: dashed; }
+table.standings td.pos { font-size: .95rem; }
 .sync.offline { color: #ffcf5c; opacity: 1; }
 
 .view { max-width: 720px; margin: 0 auto; padding: 12px 16px 24px; outline: none; }
